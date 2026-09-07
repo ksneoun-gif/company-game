@@ -210,7 +210,7 @@
         <span id="management-summary"></span>
     </div>
 
-    <h4 style="text-align: left; margin-top: 25px; margin-bottom: 10px; font-size: 16px;">🏆 세션 순위 (가상 시뮬레이션)</h4>
+    <h4 style="text-align: left; margin-top: 25px; margin-bottom: 10px; font-size: 16px;">🏆 세션 전체 참여자 최종 순위</h4>
     <table class="ranking-table">
         <thead>
             <tr><th>순위</th><th>참여자(계급)</th><th>최종 순이익</th><th>신뢰도</th></tr>
@@ -235,6 +235,13 @@
         reconnectionAttempts: Infinity,
         reconnectionDelay: 1000,
         timeout: 20000
+    });
+
+    // 💡 [수정 1] 접속된 세션의 실제 유저 목록 데이터를 실시간으로 보관하는 변수 추가
+    let sessionPlayers = {};
+    
+    socket.on('update_dashboard', (players) => {
+        sessionPlayers = players;
     });
 
     const codeDict = {
@@ -295,6 +302,9 @@
     const gameState = {
         session: "", milId: "", rank: "", name: "",
         turn: 1, maxTurns: 10, balance: 50000000, trust: 10, debt: 0,
+        // 💡 [수정 2] 돌발상황이 무조건 4~8턴 중 단 1회만 발생하도록 게임 시작 시 사전 세팅
+        eventTurn: Math.floor(Math.random() * 5) + 4,
+        isCrisisEvent: Math.random() < 0.5,
         expenses: {
             "임직원 급여 (인건비)": 15000000, "본사 사옥 임차료": 5000000,
             "전기광열비 및 공과금": 2000000, "네트워크 통신비": 1000000,
@@ -600,7 +610,6 @@
         });
     }
 
-    // 💡 다음 턴 진행 이벤트 (10턴 도달 시 더 이상 진행하지 않고 최종 결과창 출력)
     socket.on('trigger_next_turn', () => {
         if (gameState.turn >= 10) {
             showResult();
@@ -631,7 +640,6 @@
         });
     });
 
-    // 💡 운영자 강제 종료 이벤트
     socket.on('trigger_game_end', () => {
         showResult();
         socket.emit('update_state', {
@@ -644,13 +652,11 @@
         });
     });
 
-    // 💡 강제 퇴장 이벤트
     socket.on('kicked', () => {
         alert("운영자에 의해 세션에서 퇴장 처리되었습니다.");
         location.reload();
     });
 
-    // 💡 세션 전체 초기화 이벤트
     socket.on('session_reset', () => {
         alert("운영자가 게임 세션을 초기화했습니다. 시작 화면으로 돌아갑니다.");
         location.reload();
@@ -692,33 +698,35 @@
 
         let alertHtml = "";
         
-        if (gameState.turn >= 4 && Math.random() < 0.3) {
-            const rEvent = crisisEvents[Math.floor(Math.random() * crisisEvents.length)];
-            rEvent.apply(gameState);
-            let impactHtml = rEvent.getImpact(gameState);
-            
-            alertHtml += `<div style="background: #fff; border: 3px solid var(--red); padding: 16px; border-radius: 12px; margin-bottom: 15px; box-shadow: 4px 4px 0px var(--red);">`;
-            alertHtml += `<h3 style="color: var(--red); margin-top: 0; margin-bottom: 12px; font-size: 19px; text-align: left;">⚠️ 긴급 사태 발생</h3>`;
-            alertHtml += `<p style="color: var(--red); font-weight: 900; font-size: 15px; margin-bottom: 8px;">[${rEvent.name}]</p>`;
-            alertHtml += `<p style="font-size: 14px; font-weight: 700; color: #222; line-height: 1.6; margin: 0 0 12px 0;">${rEvent.msg}</p>`;
-            alertHtml += `<div style="background: #FFF1F2; border: 1px solid var(--red); padding: 10px; border-radius: 8px; font-weight: 800; font-size: 14px; line-height: 1.5;">${impactHtml}</div>`;
-            alertHtml += `</div>`;
-            
-            addLog(`<span style="color:var(--red); font-weight:900;">[재난 발생] ${rEvent.name}</span>`);
-            
-        } else if (gameState.turn > 5 && Math.random() < 0.4) {
-            const rEvent = randomEvents[Math.floor(Math.random() * randomEvents.length)];
-            rEvent.apply(gameState);
-            let impactHtml = rEvent.getImpact(gameState);
-            
-            alertHtml += `<div style="background: #fff; border: 3px solid var(--orange); padding: 16px; border-radius: 12px; margin-bottom: 15px; box-shadow: 4px 4px 0px var(--orange);">`;
-            alertHtml += `<h3 style="color: var(--orange); margin-top: 0; margin-bottom: 12px; font-size: 18px; text-align: left;">🚨 경영 돌발 상황</h3>`;
-            alertHtml += `<p style="color: var(--orange); font-weight: 900; font-size: 15px; margin-bottom: 8px;">[${rEvent.name}]</p>`;
-            alertHtml += `<p style="font-size: 14px; font-weight: 700; color: #222; line-height: 1.6; margin: 0 0 12px 0;">${rEvent.msg}</p>`;
-            alertHtml += `<div style="background: #FFF7ED; border: 1px solid var(--orange); padding: 10px; border-radius: 8px; font-weight: 800; font-size: 14px; line-height: 1.5;">${impactHtml}</div>`;
-            alertHtml += `</div>`;
-            
-            addLog(`<span class="log-warning">[돌발] ${rEvent.name}</span>`);
+        // 💡 [수정 3] 돌발상황은 게임 시작 시 지정된 4~8턴 중 1회만 정확히 발생하도록 변경
+        if (gameState.turn === gameState.eventTurn) {
+            if (gameState.isCrisisEvent) {
+                const rEvent = crisisEvents[Math.floor(Math.random() * crisisEvents.length)];
+                rEvent.apply(gameState);
+                let impactHtml = rEvent.getImpact(gameState);
+                
+                alertHtml += `<div style="background: #fff; border: 3px solid var(--red); padding: 16px; border-radius: 12px; margin-bottom: 15px; box-shadow: 4px 4px 0px var(--red);">`;
+                alertHtml += `<h3 style="color: var(--red); margin-top: 0; margin-bottom: 12px; font-size: 19px; text-align: left;">⚠️ 긴급 사태 발생</h3>`;
+                alertHtml += `<p style="color: var(--red); font-weight: 900; font-size: 15px; margin-bottom: 8px;">[${rEvent.name}]</p>`;
+                alertHtml += `<p style="font-size: 14px; font-weight: 700; color: #222; line-height: 1.6; margin: 0 0 12px 0;">${rEvent.msg}</p>`;
+                alertHtml += `<div style="background: #FFF1F2; border: 1px solid var(--red); padding: 10px; border-radius: 8px; font-weight: 800; font-size: 14px; line-height: 1.5;">${impactHtml}</div>`;
+                alertHtml += `</div>`;
+                
+                addLog(`<span style="color:var(--red); font-weight:900;">[재난 발생] ${rEvent.name}</span>`);
+            } else {
+                const rEvent = randomEvents[Math.floor(Math.random() * randomEvents.length)];
+                rEvent.apply(gameState);
+                let impactHtml = rEvent.getImpact(gameState);
+                
+                alertHtml += `<div style="background: #fff; border: 3px solid var(--orange); padding: 16px; border-radius: 12px; margin-bottom: 15px; box-shadow: 4px 4px 0px var(--orange);">`;
+                alertHtml += `<h3 style="color: var(--orange); margin-top: 0; margin-bottom: 12px; font-size: 18px; text-align: left;">🚨 경영 돌발 상황</h3>`;
+                alertHtml += `<p style="color: var(--orange); font-weight: 900; font-size: 15px; margin-bottom: 8px;">[${rEvent.name}]</p>`;
+                alertHtml += `<p style="font-size: 14px; font-weight: 700; color: #222; line-height: 1.6; margin: 0 0 12px 0;">${rEvent.msg}</p>`;
+                alertHtml += `<div style="background: #FFF7ED; border: 1px solid var(--orange); padding: 10px; border-radius: 8px; font-weight: 800; font-size: 14px; line-height: 1.5;">${impactHtml}</div>`;
+                alertHtml += `</div>`;
+                
+                addLog(`<span class="log-warning">[돌발] ${rEvent.name}</span>`);
+            }
         }
 
         let totalInflow = gameState.balance - oldBalanceBeforeInflow;
@@ -768,21 +776,54 @@
         return summary;
     }
 
-    function renderRanking(myNetProfit) {
-        const mockPlayers = [
-            { name: "이CEO", rank: "대위", net: 120000000, trust: 65 },
-            { name: "김운영", rank: "군무원", net: -15000000, trust: 20 },
-            { name: "박전략", rank: "중위", net: 85000000, trust: 75 },
-            { name: "최재무", rank: "하사", net: 230000000, trust: 85 }
-        ];
-        
-        mockPlayers.push({ name: gameState.name, rank: gameState.rank, net: myNetProfit, trust: gameState.trust, isMe: true });
-        mockPlayers.sort((a, b) => b.net - a.net);
+    // 💡 [수정 4] 가상 인물 대신 실제 세션에 참여한 플레이어 데이터를 가공하여 순위표 생성
+    function renderRanking() {
+        let realPlayers = [];
+        let myIdFound = false;
+
+        // 서버에서 받아온 전체 플레이어 명단(sessionPlayers)을 배열로 가공
+        for (let id in sessionPlayers) {
+            let p = sessionPlayers[id];
+            let isMe = (p.milId === gameState.milId && p.name === gameState.name);
+            
+            if (isMe) {
+                realPlayers.push({
+                    name: gameState.name,
+                    rank: gameState.rank,
+                    net: gameState.balance - 50000000,
+                    trust: gameState.trust,
+                    isMe: true
+                });
+                myIdFound = true;
+            } else {
+                realPlayers.push({
+                    name: p.name,
+                    rank: p.rank,
+                    net: p.balance - 50000000,
+                    trust: p.trust,
+                    isMe: false
+                });
+            }
+        }
+
+        // 혹시라도 네트워크 딜레이로 본인 정보가 배열에 없다면 직접 밀어넣음
+        if (!myIdFound) {
+            realPlayers.push({
+                name: gameState.name,
+                rank: gameState.rank,
+                net: gameState.balance - 50000000,
+                trust: gameState.trust,
+                isMe: true
+            });
+        }
+
+        // 당기순이익(net)을 기준으로 내림차순 정렬 (1위부터 표시)
+        realPlayers.sort((a, b) => b.net - a.net);
 
         const tbody = document.getElementById("ranking-body");
         tbody.innerHTML = "";
         
-        mockPlayers.forEach((p, index) => {
+        realPlayers.forEach((p, index) => {
             const tr = document.createElement("tr");
             if (p.isMe) tr.className = "my-rank";
             
@@ -791,7 +832,7 @@
             tr.innerHTML = `
                 <td>${rankIcon}</td>
                 <td>${p.name} (${p.rank}) ${p.isMe ? '(나)' : ''}</td>
-                <td>${formatMoney(p.net)}</td>
+                <td style="color:${p.net >= 0 ? 'var(--blue)' : 'var(--orange)'};">${formatMoney(p.net)}</td>
                 <td>${p.trust}%</td>
             `;
             tbody.appendChild(tr);
@@ -825,7 +866,7 @@
         }
         document.getElementById("evaluation-title").innerText = evalTitle;
 
-        renderRanking(netProfit);
+        renderRanking(); // 더 이상 가상 인자를 넘기지 않고 함수 자체에서 실제 명단을 호출합니다.
     }
 </script>
 </body>

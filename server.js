@@ -13,7 +13,6 @@ const io = new Server(server, {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 편의 라우트
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -24,7 +23,6 @@ app.get('/admin', (req, res) => {
 const gameSessions = {}; 
 
 io.on('connection', (socket) => {
-    // 1. 게임 접속
     socket.on('join_game', (data) => {
         const { sessionCode, name, rank, milId, isOperator } = data;
         socket.join(sessionCode);
@@ -42,7 +40,6 @@ io.on('connection', (socket) => {
 
             if (existingId) {
                 const prev = gameSessions[sessionCode].players[existingId];
-                // 이미 끝난 게임이거나 새 게임을 시작하는 경우 초기화
                 if (prev.status.includes('완료') || prev.status.includes('종료') || prev.status.includes('파산')) {
                     gameSessions[sessionCode].players[socket.id] = {
                         name, rank, milId, balance: 50000000, trust: 10, debt: 0,
@@ -50,7 +47,6 @@ io.on('connection', (socket) => {
                     };
                     if (existingId !== socket.id) delete gameSessions[sessionCode].players[existingId];
                 } else {
-                    // 진행 중 단순 재접속
                     gameSessions[sessionCode].players[socket.id] = prev;
                     gameSessions[sessionCode].players[socket.id].status = prev.status.replace(' (네트워크 끊김)', '');
                     if (existingId !== socket.id) delete gameSessions[sessionCode].players[existingId];
@@ -65,7 +61,6 @@ io.on('connection', (socket) => {
         io.to(sessionCode).emit('update_dashboard', gameSessions[sessionCode].players);
     });
 
-    // 2. 실시간 상태 업데이트
     socket.on('update_state', (stateData) => {
         const sCode = socket.sessionCode;
         if (sCode && gameSessions[sCode] && gameSessions[sCode].players[socket.id]) {
@@ -74,7 +69,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 3. 턴 일괄 진행 (10턴 한계 완벽 적용)
     socket.on('force_next_turn', (sessionCode) => {
         if (gameSessions[sessionCode]) {
             const players = gameSessions[sessionCode].players;
@@ -92,7 +86,6 @@ io.on('connection', (socket) => {
                 }
             }
 
-            // 10턴 미만인 사람이 있으면 다음 턴으로 진행, 전원 10턴이면 자동 결산 종료
             if (canAdvance) {
                 io.to(sessionCode).emit('trigger_next_turn');
             } else {
@@ -102,7 +95,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 4. 운영자 재량 게임 강제 종료
     socket.on('force_end_game', (sessionCode) => {
         if (gameSessions[sessionCode]) {
             const players = gameSessions[sessionCode].players;
@@ -116,7 +108,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 5. 유령 참가자 개별 강제 퇴장
     socket.on('kick_player', ({ sessionCode, socketId }) => {
         if (gameSessions[sessionCode] && gameSessions[sessionCode].players[socketId]) {
             delete gameSessions[sessionCode].players[socketId];
@@ -125,7 +116,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 6. 세션 전체 초기화 (이전 참가자 명단 싹 비우기)
     socket.on('reset_session', (sessionCode) => {
         if (gameSessions[sessionCode]) {
             io.to(sessionCode).emit('session_reset');
@@ -134,7 +124,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 7. 연결 종료
     socket.on('disconnect', () => {
         const sCode = socket.sessionCode;
         if (sCode && gameSessions[sCode] && !socket.isOperator) {
