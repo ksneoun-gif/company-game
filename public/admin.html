@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>회사 키우기 - 운영자 대시보드</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { font-family: 'Pretendard Variable', sans-serif; background: #f4f5f7; padding: 20px; color: #111; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; border: 3px solid #111; box-shadow: 6px 6px 0px #111; }
+        h1 { margin-top: 0; color: #2A82FF; }
+        .control-panel { margin-bottom: 20px; padding: 15px; background: #FFF4E8; border: 2px solid #111; border-radius: 10px; }
+        input { padding: 10px; font-size: 15px; border: 2px solid #111; border-radius: 8px; }
+        button { padding: 10px 20px; font-size: 15px; font-weight: bold; background: #111; color: white; border: 2px solid #111; border-radius: 8px; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; text-align: center; }
+        th, td { border: 2px solid #111; padding: 12px; }
+        th { background: #111; color: white; }
+        .btn-next { background: #FF5E3A; color: white; width: 100%; padding: 15px; font-size: 18px; font-weight: 900; margin-top: 20px; box-shadow: 4px 4px 0px #111; transition: 0.2s; cursor: pointer; border: 2px solid #111; border-radius: 10px; }
+        .btn-next:active { transform: translate(3px, 3px); box-shadow: 0px 0px 0px #111; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>👑 게임 관제 대시보드</h1>
+        
+        <div class="control-panel">
+            <label><b>세션 번호:</b></label>
+            <input type="text" id="sessionCode" placeholder="세션 번호 입력">
+            <button onclick="connectAdmin()">대시보드 접속</button>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>참여자 정보</th>
+                    <th>현재 턴</th>
+                    <th>보유 현금</th>
+                    <th>신뢰도 / 부채</th>
+                    <th>최근 행동</th>
+                    <th>턴 상태</th>
+                </tr>
+            </thead>
+            <tbody id="player-list">
+                <tr><td colspan="6">세션에 접속하여 참가자 대기 중...</td></tr>
+            </tbody>
+        </table>
+
+        <button class="btn-next" id="btn-next-turn" onclick="forceNextTurn()">전체 인원 일괄 다음 턴 진행 ➡️</button>
+    </div>
+
+    <script>
+        // 끊겨도 백그라운드에서 무한정 재연결을 시도하도록 강화된 코드
+        const socket = io({
+            reconnection: true,
+            reconnectionAttempts: Infinity,
+            reconnectionDelay: 1000,
+            timeout: 20000
+        });
+        
+        let currentSession = "";
+
+        function connectAdmin() {
+            currentSession = document.getElementById("sessionCode").value.trim();
+            if (!currentSession) return alert("세션 번호를 입력하세요.");
+            socket.emit('join_game', { sessionCode: currentSession, isOperator: true });
+            alert(`[${currentSession}] 세션 관제를 시작합니다.`);
+        }
+
+        socket.on('update_dashboard', (players) => {
+            const tbody = document.getElementById("player-list");
+            tbody.innerHTML = "";
+            let allDone = true;
+            let playerCount = 0;
+
+            for (let id in players) {
+                playerCount++;
+                const p = players[id];
+                
+                if (p.status !== '턴 완료 (대기중)' && !p.status.includes('파산')) {
+                    allDone = false;
+                }
+                
+                let statusColor = p.status === '턴 완료 (대기중)' ? '#2A82FF' : (p.status.includes('파산') ? '#111' : '#E11D48');
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td><b>${p.rank} ${p.name}</b><br><small>${p.milId}</small></td>
+                        <td>${p.turn} 턴</td>
+                        <td style="color:#2A82FF; font-weight:900;">${Number(p.balance).toLocaleString()} ₩</td>
+                        <td>${p.trust}% / ${p.debt}%</td>
+                        <td>${p.lastAction || '-'}</td>
+                        <td style="color:${statusColor}; font-weight:bold;">${p.status}</td>
+                    </tr>
+                `;
+            }
+
+            const btnNext = document.getElementById("btn-next-turn");
+            if (playerCount === 0) {
+                tbody.innerHTML = `<tr><td colspan="6">현재 접속 중인 참가자가 없습니다.</td></tr>`;
+                btnNext.style.backgroundColor = "#FF5E3A";
+                btnNext.style.color = "white";
+                btnNext.innerText = "전체 인원 일괄 다음 턴 진행 ➡️";
+            } else if (allDone) {
+                btnNext.style.backgroundColor = "#47FF88";
+                btnNext.style.color = "#111";
+                btnNext.innerText = "✅ 전원 대기 완료! 다음 턴 진행 ➡️";
+            } else {
+                btnNext.style.backgroundColor = "#FF5E3A";
+                btnNext.style.color = "white";
+                btnNext.innerText = "⏳ 의사결정 진행 중... 강제 다음 턴 진행 ➡️";
+            }
+        });
+
+        function forceNextTurn() {
+            if (!currentSession) return alert("세션에 먼저 접속하세요.");
+            if (confirm("모든 참가자의 화면을 강제로 다음 턴으로 넘기시겠습니까?")) {
+                socket.emit('force_next_turn', currentSession);
+            }
+        }
+    </script>
+</body>
+</html>
