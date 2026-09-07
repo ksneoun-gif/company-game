@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>회사 키우기 (서버 연동 버전)</title>
+    <link rel="stylesheet" crossorigin="anonymous" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/variable/pretendardvariable.css"/>
+    <link href="https://webfontworld.github.io/gmarket/GmarketSans.css" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #FAEDE1;
+            --black: #111111;
+            --blue: #2A82FF;
+            --pink: #FF4BE4;
+            --orange: #FF5E3A;
+            --red: #E11D48;
+            --white: #FFFFFF;
+            --gray: #D9D9D9;
+        }
+
+        body { font-family: 'Pretendard Variable', Pretendard, sans-serif; background-color: var(--bg-color); color: var(--black); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 15px; box-sizing: border-box; }
+        .container { background: var(--white); padding: 24px; border-radius: 20px; border: 3px solid var(--black); box-shadow: 6px 6px 0px var(--black); width: 100%; max-width: 850px; box-sizing: border-box; position: relative; }
+        h1, h2, h3, h4 { font-family: 'GmarketSans', sans-serif; text-align: center; margin-top: 0; color: var(--black); }
+        
+        .dashboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; background: #F4F5F7; padding: 16px; border-radius: 12px; margin-bottom: 20px; border: 2px solid var(--black); box-shadow: 3px 3px 0px var(--black); }
+        .stat-box { text-align: center; font-size: 13px; font-weight: 800; color: #555; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .stat-value { font-size: 17px; color: var(--black); display: block; margin-top: 8px; font-weight: 900; word-break: keep-all; }
+        .stat-value.money { color: var(--blue); }
+
+        .income-statement, .expense-board { background: var(--white); border: 2px solid var(--black); padding: 16px; border-radius: 12px; margin-bottom: 16px; font-size: 14px; font-weight: 700; box-shadow: 3px 3px 0px var(--black); }
+        .income-statement { background: #E8F4FF; }
+        .expense-board { background: #FFF4E8; }
+        .is-row, .expense-item { display: flex; justify-content: space-between; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 2px dashed rgba(17,17,17,0.2); }
+        .is-total, .expense-total { display: flex; justify-content: space-between; font-weight: 900; border-top: 3px solid var(--black); margin-top: 10px; padding-top: 10px; font-size: 15px; border-bottom: none;}
+
+        .log-area { height: 110px; overflow-y: auto; background: var(--black); color: var(--white); padding: 16px; border-radius: 12px; font-size: 13px; line-height: 1.6; margin-bottom: 20px; border: 2px solid var(--black); box-shadow: 4px 4px 0px rgba(0,0,0,0.3); font-weight: 500; }
+        .log-turn { color: #FFE347; font-weight: bold; }
+        .log-action { color: #47FF88; font-weight: bold; }
+        .log-warning { color: #FF476B; font-weight: bold; }
+        .log-event { color: #47B2FF; font-weight: bold; }
+
+        .tab-container { display: flex; gap: 8px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px; }
+        .tab-btn { background: var(--white); color: var(--black); border: 2px solid var(--black); padding: 10px 16px; border-radius: 10px; cursor: pointer; font-weight: 800; font-size: 14px; white-space: nowrap; box-shadow: 2px 2px 0px var(--black); transition: 0.1s; }
+        .tab-btn.active { background: var(--blue); color: white; box-shadow: inset 2px 2px 0px rgba(0,0,0,0.3); transform: translate(2px, 2px); }
+
+        .card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; max-height: 280px; overflow-y: auto; margin-bottom: 20px; padding: 10px; background: #F4F5F7; border-radius: 12px; border: 2px solid var(--black); }
+        .sub-category-title { grid-column: 1 / -1; font-weight: 900; font-size: 15px; color: var(--black); border-bottom: 2px solid var(--black); padding-bottom: 6px; margin-top: 10px; }
+        
+        .action-card { background: var(--white); border: 2px solid var(--black); border-radius: 10px; padding: 12px; cursor: pointer; transition: 0.1s; text-align: left; box-shadow: 3px 3px 0px var(--black); }
+        .action-card:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: 5px 5px 0px var(--black); background: #f8fbff;}
+        .action-card:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 0px 0px 0px var(--black); }
+        .action-card:disabled { background: #E5E7EB; color: #9CA3AF; cursor: not-allowed; box-shadow: none; border-color: #9CA3AF; transform: none; }
+        
+        .action-card-title { font-weight: 800; font-size: 14px; color: var(--black); margin-bottom: 4px; }
+        .action-card-desc { font-size: 12px; font-weight: 600; color: #4B5563; }
+        .action-card-lock { font-size: 11px; color: var(--orange); font-weight: bold; margin-top: 4px; display: block; }
+
+        .action-buttons { display: flex; gap: 12px; margin-top: 15px; }
+        button { font-family: 'Pretendard Variable', sans-serif; }
+        .btn-undo { background-color: var(--white); color: var(--black); flex: 1; border: 2px solid var(--black); padding: 14px; border-radius: 12px; font-weight: 800; cursor: pointer; font-size: 14px; box-shadow: 3px 3px 0px var(--black); transition: 0.1s; }
+        .btn-undo:hover:not(:disabled) { background-color: #f1f1f1; }
+        .btn-undo:active:not(:disabled) { transform: translate(3px, 3px); box-shadow: 0px 0px 0px var(--black); }
+        .btn-undo:disabled { background-color: #f3f4f6; color: #a1a1aa; border-color: #d4d4d8; box-shadow: none; cursor: not-allowed; }
+        
+        .btn-end { background-color: var(--orange); color: white; flex: 2; border: 2px solid var(--black); padding: 14px; font-size: 15px; border-radius: 12px; font-weight: 800; cursor: pointer; box-shadow: 3px 3px 0px var(--black); transition: 0.1s; }
+        .btn-end:hover:not(:disabled) { background-color: #E64A26; }
+        .btn-end:active:not(:disabled) { transform: translate(3px, 3px); box-shadow: 0px 0px 0px var(--black); }
+        .btn-end:disabled { background-color: #f3f4f6; color: #a1a1aa; border-color: #d4d4d8; box-shadow: none; cursor: not-allowed; }
+
+        .btn-apply { background-color: var(--gray); color: var(--black); width: 100%; border: 2px solid var(--black); padding: 16px; border-radius: 12px; font-weight: 900; cursor: pointer; margin-top: 20px; font-size: 17px; box-shadow: 4px 4px 0px var(--black); transition: 0.1s; }
+        .btn-apply:hover { background-color: #d0d0d0; }
+        .btn-apply:active { transform: translate(3px, 3px); box-shadow: 0px 0px 0px var(--black); }
+
+        .input-group { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        input[type="text"], select { font-family: 'Pretendard Variable', sans-serif; font-weight: 800; font-size: 15px; width: 100%; padding: 14px; margin-top: 8px; border: 2px solid var(--black); border-radius: 10px; box-sizing: border-box; box-shadow: inset 3px 3px 0px rgba(0,0,0,0.08); outline: none; transition: 0.2s; }
+        input[type="text"]:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(42, 130, 255, 0.2); }
+        .input-label { font-weight: 900; font-size: 14px; color: var(--black); }
+
+        .hidden { display: none !important; }
+        .status-badge { background: #E8F4FF; border: 2px solid var(--black); padding: 8px 12px; border-radius: 8px; font-weight: 900; color: var(--blue); display: inline-block; box-shadow: 2px 2px 0px var(--black); margin-bottom: 16px; font-size: 14px; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 999; display: flex; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; backdrop-filter: blur(3px); }
+
+        .ranking-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-weight: 700; font-size: 14px; }
+        .ranking-table th, .ranking-table td { border: 2px solid var(--black); padding: 10px; text-align: center; }
+        .ranking-table th { background-color: var(--black); color: var(--white); }
+        .ranking-table tr.my-rank { background-color: #E8F4FF; color: var(--blue); font-weight: 900; }
+
+        @media (max-width: 600px) {
+            .card-grid, .input-group { grid-template-columns: 1fr; }
+            .dashboard { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+            .action-buttons { flex-direction: column; }
+            .input-group { gap: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="login-screen" class="container">
+    <div style="text-align: center; margin-bottom: 15px;">
+        <span style="background: var(--black); color: white; padding: 6px 14px; border-radius: 20px; font-size: 14px; font-weight: 900; font-family: 'GmarketSans'; letter-spacing: 1px;">SEASON 2026</span>
+    </div>
+    <h1 style="font-size: 34px; font-weight: 900; margin-bottom: 8px; color: var(--blue); text-shadow: 3px 3px 0px var(--black); letter-spacing: -1px;">회사 키우기</h1>
+    <p style="text-align: center; color: #333; font-size: 15px; font-weight: 800;">환영합니다! 참석자 정보를 정확히 입력해주세요.</p>
+    
+    <div style="margin-top: 30px; text-align: left;">
+        <div class="input-group">
+            <div>
+                <label class="input-label">세션 번호</label>
+                <input type="text" id="sessionCode" placeholder="예: 777" required>
+            </div>
+            <div>
+                <label class="input-label">군번 (식별번호)</label>
+                <input type="text" id="milId" placeholder="예: 25-12345" required>
+            </div>
+            <div>
+                <label class="input-label">계급 / 직급</label>
+                <select id="rankCode">
+                    <option value="하사">하사</option>
+                    <option value="중사">중사</option>
+                    <option value="상사">상사</option>
+                    <option value="원사">원사</option>
+                    <option value="준위">준위</option>
+                    <option value="소위">소위</option>
+                    <option value="중위" selected>중위</option>
+                    <option value="대위">대위</option>
+                    <option value="소령">소령</option>
+                    <option value="중령">중령</option>
+                    <option value="대령">대령</option>
+                    <option value="준장">준장</option>
+                    <option value="소장">소장</option>
+                    <option value="중장">중장</option>
+                    <option value="대장">대장</option>
+                    <option value="군무원">군무원</option>
+                </select>
+            </div>
+            <div>
+                <label class="input-label">성명</label>
+                <input type="text" id="playerName" placeholder="이름 입력" required>
+            </div>
+        </div>
+    </div>
+    <button class="btn-apply" onclick="joinGame()">확인 및 영업 시작</button>
+</div>
+
+<div id="game-screen" class="container hidden">
+    <h2 id="company-name" style="font-size: 24px; font-weight: 900; margin-bottom: 12px;">OOO 주식회사</h2>
+    <div style="text-align: center;">
+        <div class="status-badge">
+            현재 턴: <span id="current-turn">1</span> / 10 &nbsp;|&nbsp; 
+            <span style="color:var(--orange);">남은 행동: <span id="actions-left">3</span> / 3</span>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <div class="stat-box">보유 현금<span class="stat-value money" id="val-balance">50,000,000 ₩</span></div>
+        <div class="stat-box">가용 잔고<span class="stat-value" id="val-available" style="color: var(--pink);">0 ₩</span></div>
+        <div class="stat-box">기업 신뢰도<span class="stat-value" id="val-trust">10 %</span></div>
+        <div class="stat-box">부채 비율<span class="stat-value" id="val-debt">0 %</span></div>
+    </div>
+
+    <div class="income-statement">
+        <h4 style="color: var(--blue); margin-bottom: 12px;">📊 [간이 손익계산서] 이번 턴 요약</h4>
+        <div class="is-row"><span>총 영업 수익 (매출 등):</span> <span id="is-revenue" style="color:var(--blue); font-weight:900;">0 ₩</span></div>
+        <div class="is-row"><span>총 영업 비용 (투자+고정비):</span> <span id="is-expense" style="color:var(--orange); font-weight:900;">0 ₩</span></div>
+        <div class="is-total"><span>당기순이익 (Net Income):</span> <span id="is-net">0 ₩</span></div>
+    </div>
+
+    <div class="expense-board">
+        <h4 style="color: var(--orange); margin-bottom: 12px;">매 턴 고정 지출 항목</h4>
+        <div class="expense-grid" id="expense-list" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;"></div>
+    </div>
+
+    <div class="log-area" id="game-log">
+        <span class="log-turn">[시스템]</span> 자본금 50,000,000원으로 영업을 시작합니다.<br>
+        <span class="log-event">💡 [초보 CEO 팁 1] '비용 집행' 탭에서 [기초 상품 기획]을 가장 먼저 완료해야 판매가 가능합니다!</span><br>
+        <span class="log-event" style="color: #47FF88;">💡 [초보 CEO 팁 2] 초반(1~3턴)에 과감히 '고정비 절감' 투자를 해두면 10턴 내내 스노우볼이 굴러갑니다.</span><br>
+    </div>
+
+    <div class="tab-container" id="tab-menu">
+        <button class="tab-btn active" onclick="switchTab('finance')">1. 자금 조달</button>
+        <button class="tab-btn" onclick="switchTab('asset')">2. 투자/자산</button>
+        <button class="tab-btn" onclick="switchTab('sales')">3. 영업 매출</button>
+        <button class="tab-btn" onclick="switchTab('expense')">4. 비용 집행</button>
+    </div>
+
+    <div class="card-grid" id="card-grid"></div>
+
+    <div class="action-buttons">
+        <button class="btn-undo" id="btn-undo" onclick="undoLastAction()" disabled>🔙 직전 선택 취소</button>
+        <button class="btn-end" id="btn-end" onclick="endTurn()">최종 결정 및 턴 종료 (결산)</button>
+    </div>
+</div>
+
+<div id="result-screen" class="container hidden">
+    <h1 style="margin-bottom: 20px; font-weight: 900;">최종 경영 결산 보고서</h1>
+    <h3 id="evaluation-title" style="font-size: 20px; font-weight:900; padding: 15px; border: 3px solid var(--black); background: #fff; border-radius: 12px; box-shadow: 4px 4px 0px var(--black);"></h3>
+    
+    <div class="dashboard" style="margin-top: 25px;">
+        <div class="stat-box">최종 보유 현금<span class="stat-value money" id="final-balance"></span></div>
+        <div class="stat-box">누적 당기순이익<span class="stat-value" id="final-net-income" style="color: var(--pink);"></span></div>
+        <div class="stat-box">최종 신뢰도<span class="stat-value" id="final-trust"></span></div>
+        <div class="stat-box">최종 부채비율<span class="stat-value" id="final-debt"></span></div>
+    </div>
+    
+    <div style="background: var(--black); color: var(--white); padding: 15px; border-radius: 12px; margin-top: 15px; font-weight: 700; font-size: 14px; line-height: 1.6; border: 2px solid var(--black); box-shadow: 3px 3px 0px rgba(0,0,0,0.3);">
+        <span style="color: #47FF88;">[AI 경영 요약 분석]</span><br>
+        <span id="management-summary"></span>
+    </div>
+
+    <h4 style="text-align: left; margin-top: 25px; margin-bottom: 10px; font-size: 16px;">🏆 세션 순위 (가상 시뮬레이션)</h4>
+    <table class="ranking-table">
+        <thead>
+            <tr><th>순위</th><th>참여자(계급)</th><th>최종 순이익</th><th>신뢰도</th></tr>
+        </thead>
+        <tbody id="ranking-body"></tbody>
+    </table>
+
+    <button class="btn-apply" onclick="location.reload()">새로운 기업으로 다시하기</button>
+</div>
+
+<div id="turn-modal" class="modal-overlay hidden">
+    <div class="container" style="max-width: 420px; padding: 25px; border-width: 4px; box-shadow: 8px 8px 0px var(--black);">
+        <h2 id="modal-title" style="color: var(--blue); margin-bottom: 15px; font-size: 24px; text-shadow: 2px 2px 0px var(--black); font-weight: 900;"></h2>
+        <div id="modal-content" style="text-align: left;"></div>
+        <button class="btn-apply" onclick="closeTurnModal()" style="margin-top: 5px;">확인 후 영업 시작</button>
+    </div>
+</div>
+
+<script>
+    // 끊겨도 백그라운드에서 무한정 재연결을 시도하도록 강화된 코드
+    const socket = io({
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 1000,
+        timeout: 20000
+    });
+
+    const codeDict = {
+        "1101": { tab: 'finance', sub: '대출 및 차입', tag: 'debt', name: "단기 은행 운전자금 대출", desc: "현금 +3천만 / 매턴 이자 +150만", effect: (s) => { s.balance += 30000000; s.debt += 30; s.expenses["금융 대출 이자"] += 1500000; s.hasShortLoan += 1; } },
+        "1102": { tab: 'finance', sub: '대출 및 차입', tag: 'debt', name: "시설 투자 장기 대출", desc: "현금 +5천만 / 매턴 이자 +300만", effect: (s) => { s.balance += 50000000; s.debt += 50; s.expenses["금융 대출 이자"] += 3000000; s.hasLongLoan += 1; } },
+        "1103": { tab: 'finance', sub: '대출 및 차입', tag: 'debt', name: "고금리 사채 차입", desc: "현금 +2천만 / 이자 폭탄(+300만) / 신뢰-10", effect: (s) => { s.balance += 20000000; s.debt += 40; s.expenses["금융 대출 이자"] += 3000000; s.trust = Math.max(0, s.trust - 10); } },
+        "1104": { tab: 'finance', sub: '상환 및 정산', tag: 'finance_safe', name: "단기 대출 상환", desc: "🔒[단기보유] 현금 -3천만 / 이자 150만 감소", condition: (s) => s.hasShortLoan > 0, lockMsg: "대출 필요", effect: (s) => { s.balance -= 30000000; s.debt = Math.max(0, s.debt - 30); s.expenses["금융 대출 이자"] = Math.max(0, s.expenses["금융 대출 이자"] - 1500000); s.hasShortLoan -= 1; } },
+        "1105": { tab: 'finance', sub: '상환 및 정산', tag: 'finance_safe', name: "장기 대출 상환", desc: "🔒[장기보유] 현금 -5천만 / 이자 300만 감소", condition: (s) => s.hasLongLoan > 0, lockMsg: "대출 필요", effect: (s) => { s.balance -= 50000000; s.debt = Math.max(0, s.debt - 50); s.expenses["금융 대출 이자"] = Math.max(0, s.expenses["금융 대출 이자"] - 3000000); s.trust += 10; s.hasLongLoan -= 1; } },
+        "1106": { tab: 'finance', sub: '상환 및 정산', tag: 'finance_safe', name: "매입채무 조기 결제", desc: "현금 -1.5천만 / 부채비율 -10% / 신뢰도+5", effect: (s) => { s.balance -= 15000000; s.debt = Math.max(0, s.debt - 10); s.trust += 5; } },
+        "1201": { tab: 'finance', sub: '자본 유치', tag: 'investment', name: "대표이사 사비 수혈", isOneTime: true, desc: "현금 +2천만 (1회 한정)", effect: (s) => { s.balance += 20000000; } },
+        "1202": { tab: 'finance', sub: '자본 유치', tag: 'investment', name: "엔젤 투자자 유치", isOneTime: true, desc: "현금 +3천만 / 부채감소", effect: (s) => { s.balance += 30000000; s.debt = Math.max(0, s.debt - 10); s.trust += 5; } },
+        "1203": { tab: 'finance', sub: '자본 유치', tag: 'investment', name: "시리즈 A 투자", isOneTime: true, desc: "🔒[신뢰40%+] 현금 +1억", condition: (s) => s.trust >= 40, lockMsg: "신뢰 40% 이상", effect: (s) => { s.balance += 100000000; s.debt = Math.max(0, s.debt - 20); s.trust += 10; } },
+        "1301": { tab: 'finance', sub: '정부/공공 지원', tag: 'public', name: "정부 R&D 지원금", isOneTime: true, desc: "🔒[신뢰30%+] 현금 +3천만", condition: (s) => s.trust >= 30, lockMsg: "신뢰 30% 이상", effect: (s) => { s.balance += 30000000; s.trust += 10; } },
+        "1302": { tab: 'finance', sub: '정부/공공 지원', tag: 'public', name: "국방/안보 펀드 조달", isOneTime: true, desc: "🔒[3턴+] 현금 +5천만 / 신뢰+10", condition: (s) => s.turn >= 3, lockMsg: "3턴 이후", effect: (s) => { s.balance += 50000000; s.trust += 10; } },
+        "1303": { tab: 'finance', sub: '정부/공공 지원', tag: 'public', name: "초기 창업 체질개선 지원금", isOneTime: true, desc: "🔒[1~3턴 한정] 현금 +2천만", condition: (s) => s.turn <= 3, lockMsg: "3턴까지만 신청 가능", effect: (s) => { s.balance += 20000000; s.trust += 5; } },
+
+        "2101": { tab: 'asset', sub: '유형 자산', tag: 'infra', name: "본사 사옥 매입", isOneTime: true, desc: "현금 -4천만 / 임차료 500만 영구면제", effect: (s) => { s.balance -= 40000000; s.trust += 15; s.expenses["본사 사옥 임차료"] = 0; } },
+        "2102": { tab: 'asset', sub: '유형 자산', tag: 'infra', name: "IT 장비 전면 교체", desc: "현금 -1.5천만 / 통신비 50만 감면", effect: (s) => { s.balance -= 15000000; s.expenses["네트워크 통신비"] = Math.max(0, s.expenses["네트워크 통신비"] - 500000); } },
+        "2103": { tab: 'asset', sub: '유형 자산', tag: 'infra', name: "영업용 차량(Fleet) 구입", isOneTime: true, desc: "현금 -1.5천만 / 신뢰도+10", effect: (s) => { s.balance -= 15000000; s.trust += 10; } },
+        "2104": { tab: 'asset', sub: '유형 자산', tag: 'infra', name: "에너지 고효율 공사", isOneTime: true, desc: "현금 -5백만 / 🌟광열비 100만 영구절감", effect: (s) => { s.balance -= 5000000; s.expenses["전기광열비 및 공과금"] = Math.max(0, s.expenses["전기광열비 및 공과금"] - 1000000); } },
+        "2201": { tab: 'asset', sub: '첨단 인프라', tag: 'rnd', name: "스마트 공장 구축", desc: "현금 -3.5천만 / 매출원가 400만 절감", effect: (s) => { s.balance -= 35000000; s.expenses["기본 매출원가"] = Math.max(0, s.expenses["기본 매출원가"] - 4000000); } },
+        "2202": { tab: 'asset', sub: '첨단 인프라', tag: 'rnd', name: "AI 빅데이터 도입", isOneTime: true, desc: "🔒[3턴+] 현금 -4천만 / ⏳2턴뒤 +8천만", condition: (s) => s.turn >= 3, lockMsg: "3턴 이후", effect: (s) => { s.balance -= 40000000; addPendingEvent(s.turn + 2, 80000000, "AI 인프라 성과 발생!"); s.trust += 10; } },
+        "2203": { tab: 'asset', sub: '첨단 인프라', tag: 'cost_reduction', name: "전사적 자원관리(ERP) 도입", isOneTime: true, desc: "현금 -1천만 / 🌟고정인건비 200만 절감", effect: (s) => { s.balance -= 10000000; s.expenses["임직원 급여 (인건비)"] = Math.max(0, s.expenses["임직원 급여 (인건비)"] - 2000000); s.trust += 5; } },
+        "2301": { tab: 'asset', sub: '무형 및 금융', tag: 'finance_safe', name: "우량 배당형 ETF 매수", desc: "현금 -3천만 / ⏳매턴 배당금 +150만", effect: (s) => { s.balance -= 30000000; addContinuousEvent("ETF 배당금", 1500000); } },
+        "2302": { tab: 'asset', sub: '무형 및 금융', tag: 'finance_safe', name: "책임 보험 가입", isOneTime: true, desc: "현금 -1천만 / 신뢰도+5", effect: (s) => { s.balance -= 10000000; s.trust += 5; recordExpense(10000000); } },
+        "2303": { tab: 'asset', sub: '무형 및 금융', tag: 'cost_reduction', name: "임직원 원가분석 교육수료", isOneTime: true, desc: "현금 -5백만 / 🌟매출원가 200만 영구절감", effect: (s) => { s.balance -= 5000000; s.expenses["기본 매출원가"] = Math.max(0, s.expenses["기본 매출원가"] - 2000000); recordExpense(5000000); } },
+        "2304": { tab: 'asset', sub: '무형 및 금융', tag: 'cost_reduction', name: "국가공인 원가분석사 자문", isOneTime: true, desc: "현금 -8백만 / 🌟매출원가 300만 영구절감", effect: (s) => { s.balance -= 8000000; s.expenses["기본 매출원가"] = Math.max(0, s.expenses["기본 매출원가"] - 3000000); recordExpense(8000000); } },
+        "2305": { tab: 'asset', sub: '무형 및 금융', tag: 'rnd', name: "원천 기술 특허 매입", isOneTime: true, desc: "현금 -2천만 / 신뢰도+15", effect: (s) => { s.balance -= 20000000; s.trust += 15; recordExpense(20000000); } },
+        "2306": { tab: 'asset', sub: '무형 및 금융', tag: 'public', name: "국방기술품질원 납품인증", isOneTime: true, desc: "현금 -1.5천만 / 신뢰도+20", effect: (s) => { s.balance -= 15000000; s.trust += 20; recordExpense(15000000); } },
+
+        "3101": { tab: 'sales', sub: '기본 판매', tag: 'sales', name: "주력 상품 현금 판매", desc: "🔒[기초상품 필요] 현금입금 / 원가 200만↑", condition: (s) => s.isProductReady, lockMsg: "기초상품(4101) 기획 필수", effect: (s) => { let amt = 15000000 + (s.trust * 200000); s.balance += amt; s.trust += 2; s.expenses["기본 매출원가"] += 2000000; recordRevenue(amt); } },
+        "3102": { tab: 'sales', sub: '기본 판매', tag: 'sales', name: "주력 상품 외상 판매", desc: "🔒[기초상품 필요] ⏳2턴뒤 거액입금 / 원가↑", condition: (s) => s.isProductReady, lockMsg: "기초상품(4101) 기획 필수", effect: (s) => { let amt = 25000000 + (s.trust * 300000); s.trust += 5; s.hasReceivables += 1; s.expenses["기본 매출원가"] += 3000000; addPendingEvent(s.turn + 2, amt, "외상 대금 수금"); } },
+        "3103": { tab: 'sales', sub: '기본 판매', tag: 'finance_safe', name: "미수금 조기 회수", desc: "🔒[외상보유] 현금 +2.5천만 즉시 수금", condition: (s) => s.hasReceivables > 0, lockMsg: "외상 판매 이력 필요", effect: (s) => { s.balance += 25000000; s.hasReceivables -= 1; recordRevenue(25000000); } },
+        "3104": { tab: 'sales', sub: '기본 판매', tag: 'sales', name: "재고 떨이 덤핑 판매", desc: "현금 +1천만 / 신뢰도-5 하락", effect: (s) => { s.balance += 10000000; s.trust = Math.max(0, s.trust - 5); recordRevenue(10000000); } },
+        "3105": { tab: 'sales', sub: '기본 판매', tag: 'sales', name: "구독형 서비스 런칭", isOneTime: true, desc: "현금 -1천만 / ⏳매턴 수익 +200만", effect: (s) => { s.balance -= 10000000; addContinuousEvent("구독 모델 수익", 2000000); } },
+        "3201": { tab: 'sales', sub: '대형 수주', tag: 'public', name: "공공기관 대규모 프로젝트", isOneTime: true, desc: "🔒[신뢰40%+] 현금 +8천만", condition: (s) => s.trust >= 40, lockMsg: "신뢰 40% 이상", effect: (s) => { s.balance += 80000000; s.trust += 10; recordRevenue(80000000); } },
+        "3202": { tab: 'sales', sub: '대형 수주', tag: 'public', name: "군납(방산) 장기 계약", isOneTime: true, desc: "🔒[신뢰50%+] ⏳매턴 수익 +500만", condition: (s) => s.trust >= 50, lockMsg: "신뢰 50% 이상", effect: (s) => { addContinuousEvent("국방 납품 수익", 5000000); s.trust += 15; } },
+        "3203": { tab: 'sales', sub: '대형 수주', tag: 'sales', name: "글로벌 B2B 독점 계약", isOneTime: true, desc: "🔒[신뢰60%+] 현금 +1.5억", condition: (s) => s.trust >= 60, lockMsg: "신뢰 60% 이상", effect: (s) => { s.balance += 150000000; s.trust += 15; recordRevenue(150000000); } },
+        "3204": { tab: 'sales', sub: '대형 수주', tag: 'sales', name: "동남아시아 수출 개시", isOneTime: true, desc: "🔒[5턴+] 현금 +6천만", condition: (s) => s.turn >= 5, lockMsg: "5턴 이후", effect: (s) => { s.balance += 60000000; s.trust += 10; recordRevenue(60000000); } },
+        "3301": { tab: 'sales', sub: '특수 매출', tag: 'rnd', name: "특허 기술 라이선스 아웃", isOneTime: true, desc: "🔒[4턴+] 현금 +4천만", condition: (s) => s.turn >= 4, lockMsg: "4턴 이후", effect: (s) => { s.balance += 40000000; s.trust += 10; recordRevenue(40000000); } },
+        "3302": { tab: 'sales', sub: '특수 매출', tag: 'public', name: "우수 혁신기업 포상금", isOneTime: true, desc: "🔒[신뢰70%+] 현금 +5천만", condition: (s) => s.trust >= 70, lockMsg: "신뢰 70% 이상", effect: (s) => { s.balance += 50000000; s.trust += 15; recordRevenue(50000000); } },
+        "3303": { tab: 'sales', sub: '특수 매출', tag: 'sales', name: "프리미엄 라인업 한정판매", isOneTime: true, desc: "현금 -1천만 / ⏳다음턴 +3천만", effect: (s) => { s.balance -= 10000000; addPendingEvent(s.turn + 1, 30000000, "프리미엄 판매 대금"); } },
+
+        "4101": { tab: 'expense', sub: '마케팅/R&D', tag: 'rnd', name: "기초 상품 기획 (필수)", isOneTime: true, desc: "현금 -1.5천만 / 🌟영업 판매 해금", effect: (s) => { s.balance -= 15000000; s.isProductReady = true; s.trust += 10; recordExpense(15000000); } },
+        "4102": { tab: 'expense', sub: '마케팅/R&D', tag: 'sales', name: "브랜드 대규모 마케팅", desc: "현금 -2.5천만 / 신뢰도 +25 대폭 상승", effect: (s) => { s.balance -= 25000000; s.trust += 25; recordExpense(25000000); } },
+        "4103": { tab: 'expense', sub: '마케팅/R&D', tag: 'rnd', name: "차세대 R&D 집중 투자", isOneTime: true, desc: "현금 -4천만 / ⏳2턴 뒤 +8천만", effect: (s) => { s.balance -= 40000000; s.trust += 20; recordExpense(40000000); addPendingEvent(s.turn + 2, 80000000, "R&D 신제품 대금!"); } },
+        "4104": { tab: 'expense', sub: '마케팅/R&D', tag: 'sales', name: "인플루언서 바이럴 협찬", desc: "현금 -8백만 / 신뢰도+10", effect: (s) => { s.balance -= 8000000; s.trust += 10; recordExpense(8000000); } },
+        "4201": { tab: 'expense', sub: '경영 관리', tag: 'cost_reduction', name: "전문 외주 가공 위탁", desc: "현금 -1.5천만 / 🌟매출원가 400만 절감", effect: (s) => { s.balance -= 15000000; s.expenses["기본 매출원가"] = Math.max(0, s.expenses["기본 매출원가"] - 4000000); recordExpense(15000000); } },
+        "4202": { tab: 'expense', sub: '경영 관리', tag: 'finance_safe', name: "부실 채권 대손 상각", desc: "현금 -2천만 / 부채비율 15% 감소", effect: (s) => { s.balance -= 20000000; s.trust += 5; s.debt = Math.max(0, s.debt - 15); recordExpense(20000000); } },
+        "4203": { tab: 'expense', sub: '경영 관리', tag: 'esg', name: "모범 성실 납세 및 회계자문", desc: "현금 -1.5천만 / 신뢰도 +15", effect: (s) => { s.balance -= 15000000; s.trust += 15; recordExpense(15000000); } },
+        "4204": { tab: 'expense', sub: '경영 관리', tag: 'cost_reduction', name: "기업 통신망 단체할인 협상", isOneTime: true, desc: "현금 -2백만 / 🌟통신비 50만 영구면제", effect: (s) => { s.balance -= 2000000; s.expenses["네트워크 통신비"] = Math.max(0, s.expenses["네트워크 통신비"] - 500000); recordExpense(2000000); } },
+        "4301": { tab: 'expense', sub: '주주환원/ESG', tag: 'esg', name: "주주 환원 현금 배당", desc: "🔒[신뢰40%+] 현금 -3천만 / 신뢰+25", condition: (s) => s.trust >= 40, lockMsg: "신뢰 40% 이상", effect: (s) => { s.balance -= 30000000; s.trust += 25; recordExpense(30000000); } },
+        "4302": { tab: 'expense', sub: '주주환원/ESG', tag: 'esg', name: "지역사회 기부", desc: "현금 -1.5천만 / 신뢰도 +20", effect: (s) => { s.balance -= 15000000; s.trust += 20; recordExpense(15000000); } },
+        "4303": { tab: 'expense', sub: '주주환원/ESG', tag: 'esg', name: "친환경 인프라 전환", isOneTime: true, desc: "현금 -2천만 / 신뢰도 +15", effect: (s) => { s.balance -= 20000000; s.trust += 15; recordExpense(20000000); } },
+        "4304": { tab: 'expense', sub: '주주환원/ESG', tag: 'cost_reduction', name: "복리후생비 현실화 (삭감)", desc: "현금 0 / 인건비 200만 감소 / ⚠️신뢰-10", effect: (s) => { s.expenses["임직원 급여 (인건비)"] = Math.max(0, s.expenses["임직원 급여 (인건비)"] - 2000000); s.trust = Math.max(0, s.trust - 10); } }
+    };
+
+    const gameState = {
+        session: "", milId: "", rank: "", name: "",
+        turn: 1, maxTurns: 10, balance: 50000000, trust: 10, debt: 0,
+        expenses: {
+            "임직원 급여 (인건비)": 15000000, "본사 사옥 임차료": 5000000,
+            "전기광열비 및 공과금": 2000000, "네트워크 통신비": 1000000,
+            "설비 감가상각비": 0, "금융 대출 이자": 0, "기본 매출원가": 10000000
+        },
+        pendingEvents: [], turnRevenue: 0, turnExpense: 0, currentTab: 'finance',
+        maxActionsPerTurn: 3, actionsThisTurn: 0, turnAppliedCodes: [], usedGlobalCodes: [], 
+        investedThisTurn: false, isProductReady: false, hasShortLoan: 0, hasLongLoan: 0, hasReceivables: 0,
+        lastTurnExpense: 0, tagCounts: { debt:0, finance_safe:0, investment:0, infra:0, rnd:0, cost_reduction:0, sales:0, public:0, esg:0 }
+    };
+
+    let stateHistory = [];
+    const getBaseExpenseTotal = () => Object.values(gameState.expenses).reduce((a, b) => a + b, 0);
+
+    function getAdjustedExpenseTotal() {
+        let total = getBaseExpenseTotal();
+        if (gameState.trust >= 50) {
+            let bonusSteps = Math.floor((gameState.trust - 40) / 10);
+            total -= (bonusSteps * 500000);
+        } else if (gameState.trust < 30) {
+            let penaltySteps = Math.floor((30 - gameState.trust) / 10) + 1;
+            total += (penaltySteps * 1000000);
+        }
+        let debtLevel = Math.floor(gameState.debt / 10);
+        if (debtLevel > 0) total += debtLevel * 1000000;
+        return Math.max(0, total);
+    }
+
+    const formatMoney = (num) => Math.round(num).toLocaleString() + " ₩";
+    const addLog = (msg) => {
+        const logArea = document.getElementById("game-log");
+        logArea.innerHTML += `${msg}<br>`;
+        logArea.scrollTop = logArea.scrollHeight;
+    };
+
+    const crisisEvents = [
+        { 
+            name: "방위사업청 특별 원가감사 착수", 
+            msg: "과거 공공 납품 건에 대한 불시 원가분석 감사가 시작되었습니다!<br>매출원가 과다계상 의혹으로 기업 신뢰도가 폭락하고 과징금이 부과됩니다.", 
+            apply: (s) => { s.trust = Math.max(0, s.trust - 25); s.balance -= 20000000; },
+            getImpact: () => `<span style='color:var(--red);'>📉 기업 신뢰도 -25% 하락</span><br><span style='color:var(--red);'>💸 과징금(보유 현금) -20,000,000 ₩</span>`
+        },
+        { 
+            name: "핵심 생산 부품 공급망 붕괴", 
+            msg: "글로벌 공급 이슈로 원자재 수급이 중단되었습니다!<br>대체 납품 루트를 긴급 확보하느라 기본 매출원가가 폭등합니다.", 
+            apply: (s) => { s.expenses["기본 매출원가"] += 5000000; },
+            getImpact: () => `<span style='color:var(--red);'>📈 기본 매출원가(고정비) +5,000,000 ₩ 상승</span>`
+        },
+        { 
+            name: "내부 재무팀 전원 퇴사 사태", 
+            msg: "경영 불안정으로 인해 핵심 재경팀이 모두 회사를 떠났습니다!<br>위기를 수습하기 위해 막대한 인건비와 자금이 즉각적으로 소모됩니다.", 
+            apply: (s) => { s.balance -= 20000000; s.expenses["임직원 급여 (인건비)"] += 2000000; },
+            getImpact: () => `<span style='color:var(--red);'>💸 수습 비용(보유 현금) -20,000,000 ₩</span><br><span style='color:var(--red);'>📈 대체 인건비(고정비) +2,000,000 ₩ 상승</span>`
+        },
+        { 
+            name: "최대 거래처 연쇄 파산", 
+            msg: "우리 기업의 가장 큰 고객사가 부도를 내며 파산했습니다!<br>현금흐름이 악화되어 보유 현금의 큰 비중이 공중 분해됩니다.", 
+            apply: (s) => { s.lastLost = Math.floor(s.balance * 0.3); s.balance -= s.lastLost; s.trust = Math.max(0, s.trust - 10); },
+            getImpact: (s) => `<span style='color:var(--red);'>💸 보유 현금 -${formatMoney(s.lastLost)} (30% 손실)</span><br><span style='color:var(--red);'>📉 기업 신뢰도 -10% 하락</span>`
+        }
+    ];
+
+    const randomEvents = [
+        { 
+            name: "글로벌 외환 위기 여파", 
+            msg: "환율 급등으로 수입 원자재 가격이 상승했습니다.", 
+            apply: (s) => { s.expenses["기본 매출원가"] += 3000000; },
+            getImpact: () => `<span style='color:var(--orange);'>📈 기본 매출원가(고정비) +3,000,000 ₩ 상승</span>`
+        },
+        { 
+            name: "거래처 단기 채무 불이행", 
+            msg: "매출 채권 일부를 회수하지 못하게 되었습니다.", 
+            apply: (s) => { s.balance -= 15000000; },
+            getImpact: () => `<span style='color:var(--orange);'>💸 보유 현금 -15,000,000 ₩ 손실</span>`
+        },
+        { 
+            name: "재경관리사 출신 우수 인재 영입", 
+            msg: "숙련된 재무 직원의 합류로 불필요한 예산이 절감됩니다!", 
+            apply: (s) => { s.expenses["임직원 급여 (인건비)"] = Math.max(0, s.expenses["임직원 급여 (인건비)"] - 2000000); },
+            getImpact: () => `<span style='color:var(--blue);'>📉 임직원 급여(고정비) -2,000,000 ₩ 절감</span>`
+        },
+        { 
+            name: "투명 경영 최우수 기업 선정", 
+            msg: "회계 투명성 입증으로 시장의 신뢰도가 크게 올랐습니다!", 
+            apply: (s) => { s.trust += 15; },
+            getImpact: () => `<span style='color:var(--blue);'>📈 기업 신뢰도 +15% 상승</span>`
+        }
+    ];
+
+    function recordRevenue(amt) { gameState.turnRevenue += amt; updateIncomeStatement(); }
+    function recordExpense(amt) { gameState.turnExpense += amt; updateIncomeStatement(); }
+    function addPendingEvent(targetTurn, moneyChange, message) { gameState.pendingEvents.push({ type: 'single', turn: targetTurn, amount: moneyChange, msg: message }); }
+    function addContinuousEvent(message, moneyChange) { gameState.pendingEvents.push({ type: 'continuous', amount: moneyChange, msg: message }); }
+
+    function switchTab(tabName) {
+        gameState.currentTab = tabName;
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelector(`.tab-btn[onclick="switchTab('${tabName}')"]`).classList.add('active');
+        renderCards();
+    }
+
+    function renderCards() {
+        const grid = document.getElementById('card-grid');
+        grid.innerHTML = "";
+        const groups = {};
+        for (const [code, info] of Object.entries(codeDict)) {
+            if (info.tab !== gameState.currentTab) continue;
+            if (!groups[info.sub]) groups[info.sub] = [];
+            groups[info.sub].push({ code, ...info });
+        }
+
+        for (const subCategory in groups) {
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'sub-category-title';
+            titleDiv.innerText = `[${subCategory}]`;
+            grid.appendChild(titleDiv);
+
+            groups[subCategory].forEach(item => {
+                let isLocked = false; let lockReason = "";
+                if (gameState.usedGlobalCodes.includes(item.code)) { isLocked = true; lockReason = "영구 실행 완료"; } 
+                else if (gameState.turnAppliedCodes.includes(item.code)) { isLocked = true; lockReason = "이번 턴 실행 완료"; } 
+                else if (gameState.actionsThisTurn >= gameState.maxActionsPerTurn) { isLocked = true; lockReason = "행동력 모두 소진"; } 
+                else if (item.condition && !item.condition(gameState)) { isLocked = true; lockReason = item.lockMsg; }
+
+                const card = document.createElement('button');
+                card.className = `action-card`;
+                card.disabled = isLocked;
+                card.innerHTML = `<div class="action-card-title">[${item.code}] ${item.name}</div><div class="action-card-desc">${item.desc}</div>${isLocked ? `<span class="action-card-lock">🔒 ${lockReason}</span>` : ''}`;
+                card.onclick = () => executeAction(item.code);
+                grid.appendChild(card);
+            });
+        }
+    }
+
+    function executeAction(code) {
+        if (gameState.actionsThisTurn >= gameState.maxActionsPerTurn) return;
+        const action = codeDict[code];
+
+        let mockState = { balance: gameState.balance, debt: gameState.debt, trust: gameState.trust, expenses: {...gameState.expenses} };
+        action.effect(mockState);
+        let debtLevel = Math.floor(mockState.debt / 10);
+        let mockBaseExp = Object.values(mockState.expenses).reduce((a, b) => a + b, 0) + (debtLevel > 0 ? debtLevel * 1000000 : 0);
+
+        if (mockState.balance - mockBaseExp < 0) {
+            alert(`[경고] '${action.name}' 실행 시 결산 때 현금 잔고가 마이너스가 되어 파산합니다!`);
+            return;
+        }
+
+        stateHistory.push(JSON.parse(JSON.stringify(gameState)));
+        action.effect(gameState);
+        gameState.turnAppliedCodes.push(code);
+        
+        if (action.tag) gameState.tagCounts[action.tag] = (gameState.tagCounts[action.tag] || 0) + 1;
+        if (action.isOneTime) gameState.usedGlobalCodes.push(code);
+        if (code.startsWith('4') || code.startsWith('5') || code.startsWith('2')) gameState.investedThisTurn = true;
+
+        gameState.actionsThisTurn++;
+        addLog(`<span class="log-action">[경영 집행]</span> <b>${action.name}</b> 실행 완료! (${gameState.actionsThisTurn}/${gameState.maxActionsPerTurn})`);
+        
+        updateUI();
+
+        socket.emit('update_state', {
+            balance: gameState.balance,
+            trust: gameState.trust,
+            debt: gameState.debt,
+            lastAction: action.name
+        });
+
+        if (code === '4101') {
+            setTimeout(() => {
+                alert("🎉 [상품 기획 완료!]\n성공적으로 기초 상품 기획을 마쳤습니다.\n\n이제 완성된 상품을 시장에 판매하여 수익을 낼 수 있습니다.\n'영업 매출' 탭으로 자동 이동합니다.");
+                switchTab('sales');
+            }, 150);
+        }
+    }
+
+    function undoLastAction() {
+        if (stateHistory.length === 0) return;
+        const lastCode = gameState.turnAppliedCodes[gameState.turnAppliedCodes.length - 1];
+        const actionName = codeDict[lastCode].name;
+        const previousState = stateHistory.pop();
+        Object.keys(previousState).forEach(key => { gameState[key] = previousState[key]; });
+
+        addLog(`<span style="color:var(--orange); font-weight:bold;">[실행 취소]</span> <b>${actionName}</b> 적용을 번복했습니다.`);
+        updateUI();
+
+        socket.emit('update_state', {
+            balance: gameState.balance,
+            trust: gameState.trust,
+            debt: gameState.debt,
+            lastAction: '실행 취소'
+        });
+    }
+
+    updateIncomeStatement = function() {
+        document.getElementById('is-revenue').innerText = formatMoney(gameState.turnRevenue);
+        let totalExpView = gameState.turnExpense + getAdjustedExpenseTotal();
+        document.getElementById('is-expense').innerText = formatMoney(totalExpView);
+        let netIncome = gameState.turnRevenue - totalExpView;
+        const netEl = document.getElementById('is-net');
+        netEl.innerText = formatMoney(netIncome);
+        netEl.style.color = netIncome >= 0 ? 'var(--blue)' : 'var(--orange)';
+    }
+
+    function renderExpenses() {
+        const list = document.getElementById("expense-list");
+        list.innerHTML = "";
+        for (const [name, amount] of Object.entries(gameState.expenses)) {
+            list.innerHTML += `<div class="expense-item"><span>${name}</span> <span style="font-weight:800;">${formatMoney(amount)}</span></div>`;
+        }
+        let diffHtml = "";
+        if (gameState.trust >= 50) {
+            let discount = Math.floor((gameState.trust - 40) / 10) * 500000;
+            diffHtml = `<div class="expense-item" style="color:var(--blue); font-weight:900; grid-column: span 2;"><span>🌟 고신뢰도 우수기업 혜택할인</span> <span>-${formatMoney(discount)}</span></div>`;
+        } else if (gameState.trust < 30) {
+            let pen = (Math.floor((30 - gameState.trust) / 10) + 1) * 1000000;
+            diffHtml = `<div class="expense-item" style="color:var(--orange); font-weight:900; grid-column: span 2;"><span>⚠️ 저신뢰 리스크 페널티 비용</span> <span>+${formatMoney(pen)}</span></div>`;
+        }
+        let debtLevel = Math.floor(gameState.debt / 10);
+        if (debtLevel > 0) {
+            diffHtml += `<div class="expense-item" style="color:var(--orange); font-weight:900; grid-column: span 2;"><span>⚠️ 부채 리스크 (10%당 100만↑)</span> <span>+${formatMoney(debtLevel * 1000000)}</span></div>`;
+        }
+        list.innerHTML += diffHtml;
+        list.innerHTML += `<div class="expense-total" style="grid-column: span 2; font-size:16px;"><span>이번 턴 최종 고정지출 합계</span> <span style="color:var(--orange);">${formatMoney(getAdjustedExpenseTotal())}</span></div>`;
+        updateIncomeStatement();
+    }
+
+    function updateUI() {
+        document.getElementById("current-turn").innerText = gameState.turn;
+        document.getElementById("actions-left").innerText = gameState.maxActionsPerTurn - gameState.actionsThisTurn;
+        document.getElementById("val-balance").innerText = formatMoney(gameState.balance);
+        let availableCash = gameState.balance - getAdjustedExpenseTotal();
+        const availableEl = document.getElementById("val-available");
+        availableEl.innerText = formatMoney(availableCash);
+        availableEl.style.color = availableCash >= 0 ? 'var(--pink)' : 'var(--orange)';
+        document.getElementById("val-trust").innerText = `${gameState.trust} %`;
+        document.getElementById("val-debt").innerText = `${gameState.debt} %`;
+        document.getElementById("btn-undo").disabled = (stateHistory.length === 0);
+        renderExpenses();
+        renderCards();
+    }
+
+    function joinGame() {
+        const sCode = document.getElementById("sessionCode").value.trim();
+        const mId = document.getElementById("milId").value.trim();
+        const pName = document.getElementById("playerName").value.trim();
+        const rCode = document.getElementById("rankCode").value;
+        if(!sCode || !mId || !pName) return alert("세션 번호, 군번, 성명을 모두 입력해주세요.");
+        
+        gameState.session = sCode; gameState.milId = mId; 
+        gameState.name = pName; gameState.rank = rCode;
+
+        socket.emit('join_game', { 
+            sessionCode: sCode, milId: mId, name: pName, rank: rCode, isOperator: false 
+        });
+
+        document.getElementById("login-screen").classList.add("hidden");
+        document.getElementById("game-screen").classList.remove("hidden");
+        document.getElementById("company-name").innerText = `[${gameState.session}] ${gameState.name} ${gameState.rank}의 주식회사`;
+        
+        gameState.lastTurnExpense = getAdjustedExpenseTotal();
+        updateUI();
+    }
+
+    function endTurn() {
+        if (!confirm(`최종적으로 현재 내역을 확정하고 턴을 종료하시겠습니까?`)) return;
+        stateHistory = [];
+
+        if (!gameState.investedThisTurn && gameState.turn > 1) {
+            gameState.trust = Math.max(0, gameState.trust - 10);
+            addLog(`<span class="log-warning">[시장 평판 폭락] 투자가 정체되어 경쟁력이 도태되며 신뢰도가 10% 급락했습니다!</span>`);
+        }
+        
+        const finalExpense = getAdjustedExpenseTotal();
+        gameState.lastTurnExpense = finalExpense;
+        gameState.turnExpense += finalExpense;
+        gameState.balance -= finalExpense;
+        
+        addLog(`[결산 완료] 고정지출 <b>${formatMoney(finalExpense)}</b> 차감 완료.`);
+        updateIncomeStatement();
+
+        if (gameState.balance < 0) {
+            addLog(`<span class="log-warning">[파산 발생] 현금 잔고가 마이너스(${formatMoney(gameState.balance)})가 되었습니다. 게임 오버!</span>`);
+            socket.emit('update_state', { balance: gameState.balance, status: '파산 (게임오버)', lastAction: '파산' });
+            setTimeout(showResult, 2000);
+            return;
+        }
+
+        document.getElementById("btn-end").innerText = "⏳ 다른 기업 완료 대기 중...";
+        document.getElementById("btn-end").disabled = true;
+        document.getElementById("btn-undo").disabled = true;
+        document.getElementById("card-grid").style.pointerEvents = "none";
+
+        socket.emit('update_state', {
+            balance: gameState.balance,
+            trust: gameState.trust,
+            debt: gameState.debt,
+            turn: gameState.turn,
+            status: '턴 완료 (대기중)',
+            lastAction: '턴 마감 확정'
+        });
+    }
+
+    socket.on('trigger_next_turn', () => {
+        document.getElementById("btn-end").innerText = "최종 결정 및 턴 종료 (결산)";
+        document.getElementById("btn-end").disabled = false;
+        document.getElementById("card-grid").style.pointerEvents = "auto";
+        
+        processAdminTurn();
+
+        socket.emit('update_state', {
+            balance: gameState.balance,
+            trust: gameState.trust,
+            debt: gameState.debt,
+            turn: gameState.turn,
+            status: '의사결정 중',
+            lastAction: `${gameState.turn}턴 시작`
+        });
+    });
+
+    function processAdminTurn() {
+        gameState.turn++;
+        gameState.turnRevenue = 0; gameState.turnExpense = 0;
+        gameState.actionsThisTurn = 0; gameState.turnAppliedCodes = [];
+        gameState.investedThisTurn = false; 
+
+        if (gameState.turn > gameState.maxTurns) { showResult(); return; }
+
+        let oldBalanceBeforeInflow = gameState.balance;
+        let baseInflow = 10000000 + (gameState.trust * 200000);
+        gameState.balance += baseInflow;
+        recordRevenue(baseInflow);
+        
+        addLog(`<br><span class="log-turn">--- 제 ${gameState.turn} 턴 시작 ---</span>`);
+        addLog(`<span class="log-event">[영업 현금] 기본 수익 ${formatMoney(baseInflow)} 유입</span>`);
+
+        let activeEvents = [];
+        for (let ev of gameState.pendingEvents) {
+            if (ev.type === 'single') {
+                if (ev.turn === gameState.turn) {
+                    gameState.balance += ev.amount; recordRevenue(ev.amount);
+                    addLog(`<span class="log-event">[예약 자금 입금] ${ev.msg} (${ev.amount > 0 ? '+' : ''}${formatMoney(ev.amount)})</span>`);
+                } else { activeEvents.push(ev); }
+            } else if (ev.type === 'continuous') {
+                gameState.balance += ev.amount; recordRevenue(ev.amount);
+                addLog(`<span class="log-event">[지속 수익 발생] ${ev.msg} (+${formatMoney(ev.amount)})</span>`);
+                activeEvents.push(ev);
+            }
+        }
+        gameState.pendingEvents = activeEvents;
+
+        let alertHtml = "";
+        
+        if (gameState.turn >= 4 && Math.random() < 0.3) {
+            const rEvent = crisisEvents[Math.floor(Math.random() * crisisEvents.length)];
+            rEvent.apply(gameState);
+            let impactHtml = rEvent.getImpact(gameState);
+            
+            alertHtml += `<div style="background: #fff; border: 3px solid var(--red); padding: 16px; border-radius: 12px; margin-bottom: 15px; box-shadow: 4px 4px 0px var(--red);">`;
+            alertHtml += `<h3 style="color: var(--red); margin-top: 0; margin-bottom: 12px; font-size: 19px; text-align: left;">⚠️ 긴급 사태 발생</h3>`;
+            alertHtml += `<p style="color: var(--red); font-weight: 900; font-size: 15px; margin-bottom: 8px;">[${rEvent.name}]</p>`;
+            alertHtml += `<p style="font-size: 14px; font-weight: 700; color: #222; line-height: 1.6; margin: 0 0 12px 0;">${rEvent.msg}</p>`;
+            alertHtml += `<div style="background: #FFF1F2; border: 1px solid var(--red); padding: 10px; border-radius: 8px; font-weight: 800; font-size: 14px; line-height: 1.5;">${impactHtml}</div>`;
+            alertHtml += `</div>`;
+            
+            addLog(`<span style="color:var(--red); font-weight:900;">[재난 발생] ${rEvent.name}</span>`);
+            
+        } else if (gameState.turn > 5 && Math.random() < 0.4) {
+            const rEvent = randomEvents[Math.floor(Math.random() * randomEvents.length)];
+            rEvent.apply(gameState);
+            let impactHtml = rEvent.getImpact(gameState);
+            
+            alertHtml += `<div style="background: #fff; border: 3px solid var(--orange); padding: 16px; border-radius: 12px; margin-bottom: 15px; box-shadow: 4px 4px 0px var(--orange);">`;
+            alertHtml += `<h3 style="color: var(--orange); margin-top: 0; margin-bottom: 12px; font-size: 18px; text-align: left;">🚨 경영 돌발 상황</h3>`;
+            alertHtml += `<p style="color: var(--orange); font-weight: 900; font-size: 15px; margin-bottom: 8px;">[${rEvent.name}]</p>`;
+            alertHtml += `<p style="font-size: 14px; font-weight: 700; color: #222; line-height: 1.6; margin: 0 0 12px 0;">${rEvent.msg}</p>`;
+            alertHtml += `<div style="background: #FFF7ED; border: 1px solid var(--orange); padding: 10px; border-radius: 8px; font-weight: 800; font-size: 14px; line-height: 1.5;">${impactHtml}</div>`;
+            alertHtml += `</div>`;
+            
+            addLog(`<span class="log-warning">[돌발] ${rEvent.name}</span>`);
+        }
+
+        let totalInflow = gameState.balance - oldBalanceBeforeInflow;
+        let newExpectedExpense = getAdjustedExpenseTotal();
+        let expenseDiff = newExpectedExpense - gameState.lastTurnExpense;
+        
+        let modalHtml = alertHtml; 
+        
+        modalHtml += `<div style="background: #F4F5F7; padding: 16px; border-radius: 12px; border: 2px solid var(--black);">`;
+        modalHtml += `<p>💰 <b>당기 유입액 (순변동):</b> <span style="color:var(--blue); font-size:16px;">${totalInflow > 0 ? '+' : ''}${formatMoney(totalInflow)}</span></p>`;
+        modalHtml += `<p>📉 <b>현재 보유 현금:</b> ${formatMoney(gameState.balance)}</p>`;
+        
+        if (expenseDiff !== 0) {
+            let color = expenseDiff > 0 ? 'var(--orange)' : 'var(--blue)';
+            let sign = expenseDiff > 0 ? '상승 (+' : '절감 (';
+            modalHtml += `<hr style="border: 1.5px dashed var(--black); margin: 15px 0;">`;
+            modalHtml += `<p>📋 <b>이번 턴 고정지출:</b> ${formatMoney(newExpectedExpense)}</p>`;
+            modalHtml += `<p style="color:${color}; font-size: 13px;">➔ 지난 턴 대비 ${sign}${formatMoney(Math.abs(expenseDiff))})</p>`;
+        } else {
+            modalHtml += `<hr style="border: 1.5px dashed var(--black); margin: 15px 0;">`;
+            modalHtml += `<p>📋 <b>이번 턴 고정지출:</b> ${formatMoney(newExpectedExpense)}</p>`;
+        }
+        modalHtml += `</div>`;
+
+        document.getElementById("modal-title").innerText = `제 ${gameState.turn} 턴 시작`;
+        document.getElementById("modal-content").innerHTML = modalHtml;
+        document.getElementById("turn-modal").classList.remove("hidden");
+    }
+
+    function closeTurnModal() {
+        document.getElementById("turn-modal").classList.add("hidden");
+        updateUI();
+    }
+
+    function generateSummary() {
+        const tc = gameState.tagCounts;
+        let summary = `${gameState.name} ${gameState.rank}님은 `;
+        if (tc.cost_reduction >= 4) summary += "뛰어난 원가분석 능력과 치밀한 고정비 통제를 통해 내실을 다지는 '효율 극대화 경영'을 펼쳤습니다. ";
+        else if (tc.debt >= 4) summary += "공격적인 레버리지(부채)를 활용해 대규모 자금을 조달하는 '공격적 팽창 경영'을 시도했습니다. ";
+        else if (tc.public >= 3) summary += "국방 및 공공기관과의 긴밀한 협력을 통해 거대한 'B2G 특수 매출 중심'의 안정적 성장을 이끌었습니다. ";
+        else if (tc.sales >= 5) summary += "시장 점유율 확대를 최우선으로 삼아 다방면의 채널을 개척하는 '영업/매출 주도형 경영'을 보여주었습니다. ";
+        else if (tc.esg >= 3) summary += "기업의 사회적 책임과 주주 환원에 집중하며 높은 평판을 유지하는 '바른 ESG 경영'을 실천했습니다. ";
+        else summary += "다양한 분야에 고르게 투자하며 밸런스를 맞추는 '균형 잡힌 안정적 경영'을 수행했습니다. ";
+        
+        if (gameState.trust >= 80) summary += "특히 시장과 고객으로부터 압도적인 신뢰를 구축한 점이 매우 훌륭합니다!";
+        else if (gameState.debt >= 100) summary += "다만, 과도한 부채 비율은 향후 기업의 재무적 뇌관이 될 수 있으므로 주의가 필요합니다.";
+        return summary;
+    }
+
+    function renderRanking(myNetProfit) {
+        const mockPlayers = [
+            { name: "이CEO", rank: "대위", net: 120000000, trust: 65 },
+            { name: "김운영", rank: "군무원", net: -15000000, trust: 20 },
+            { name: "박전략", rank: "중위", net: 85000000, trust: 75 },
+            { name: "최재무", rank: "하사", net: 230000000, trust: 85 }
+        ];
+        
+        mockPlayers.push({ name: gameState.name, rank: gameState.rank, net: myNetProfit, trust: gameState.trust, isMe: true });
+        mockPlayers.sort((a, b) => b.net - a.net);
+
+        const tbody = document.getElementById("ranking-body");
+        tbody.innerHTML = "";
+        
+        mockPlayers.forEach((p, index) => {
+            const tr = document.createElement("tr");
+            if (p.isMe) tr.className = "my-rank";
+            
+            let rankIcon = index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `${index+1}위`;
+            
+            tr.innerHTML = `
+                <td>${rankIcon}</td>
+                <td>${p.name} (${p.rank}) ${p.isMe ? '(나)' : ''}</td>
+                <td>${formatMoney(p.net)}</td>
+                <td>${p.trust}%</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function showResult() {
+        document.getElementById("game-screen").classList.add("hidden");
+        document.getElementById("result-screen").classList.remove("hidden");
+
+        let netProfit = gameState.balance - 50000000;
+        document.getElementById("final-balance").innerText = formatMoney(gameState.balance);
+        document.getElementById("final-net-income").innerText = formatMoney(netProfit);
+        document.getElementById("final-net-income").style.color = netProfit >= 0 ? 'var(--pink)' : 'var(--orange)';
+        document.getElementById("final-trust").innerText = `${gameState.trust} %`;
+        document.getElementById("final-debt").innerText = `${gameState.debt} %`;
+        document.getElementById("management-summary").innerText = generateSummary();
+
+        let evalTitle = "";
+        if (gameState.balance < 0) {
+            evalTitle = "☠️ 법인 파산 (게임 오버)";
+            document.getElementById("evaluation-title").style.borderColor = "var(--orange)";
+        } else if(gameState.balance > 200000000 && gameState.trust >= 80) {
+            evalTitle = "🌟 코스닥 상장 성공! (최우수 경영)";
+            document.getElementById("evaluation-title").style.borderColor = "var(--blue)";
+        } else if (gameState.debt > 150) {
+            evalTitle = "⚠️ 빚더미 속의 한계 기업";
+        } else {
+            evalTitle = "🏢 탄탄한 중견 기업 도약";
+        }
+        document.getElementById("evaluation-title").innerText = evalTitle;
+
+        renderRanking(netProfit);
+    }
+</script>
+</body>
+</html>
