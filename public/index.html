@@ -230,7 +230,6 @@
 </div>
 
 <script>
-    // 끊겨도 백그라운드에서 무한정 재연결을 시도하도록 강화된 코드
     const socket = io({
         reconnection: true,
         reconnectionAttempts: Infinity,
@@ -524,7 +523,7 @@
     }
 
     function updateUI() {
-        document.getElementById("current-turn").innerText = gameState.turn;
+        document.getElementById("current-turn").innerText = Math.min(gameState.turn, 10);
         document.getElementById("actions-left").innerText = gameState.maxActionsPerTurn - gameState.actionsThisTurn;
         document.getElementById("val-balance").innerText = formatMoney(gameState.balance);
         let availableCash = gameState.balance - getAdjustedExpenseTotal();
@@ -589,17 +588,33 @@
         document.getElementById("btn-undo").disabled = true;
         document.getElementById("card-grid").style.pointerEvents = "none";
 
+        let isLastTurn = (gameState.turn >= 10);
+
         socket.emit('update_state', {
             balance: gameState.balance,
             trust: gameState.trust,
             debt: gameState.debt,
-            turn: gameState.turn,
-            status: '턴 완료 (대기중)',
-            lastAction: '턴 마감 확정'
+            turn: Math.min(gameState.turn, 10),
+            status: isLastTurn ? '10턴 최종 완료 (결산 대기)' : '턴 완료 (대기중)',
+            lastAction: isLastTurn ? '10턴 최종 마감' : '턴 마감 확정'
         });
     }
 
+    // 💡 다음 턴 진행 이벤트 (10턴 도달 시 더 이상 진행하지 않고 최종 결과창 출력)
     socket.on('trigger_next_turn', () => {
+        if (gameState.turn >= 10) {
+            showResult();
+            socket.emit('update_state', {
+                balance: gameState.balance,
+                trust: gameState.trust,
+                debt: gameState.debt,
+                turn: 10,
+                status: '게임 완료 (최종 결산)',
+                lastAction: '10턴 최종 종료'
+            });
+            return;
+        }
+
         document.getElementById("btn-end").innerText = "최종 결정 및 턴 종료 (결산)";
         document.getElementById("btn-end").disabled = false;
         document.getElementById("card-grid").style.pointerEvents = "auto";
@@ -616,13 +631,41 @@
         });
     });
 
+    // 💡 운영자 강제 종료 이벤트
+    socket.on('trigger_game_end', () => {
+        showResult();
+        socket.emit('update_state', {
+            balance: gameState.balance,
+            trust: gameState.trust,
+            debt: gameState.debt,
+            turn: Math.min(gameState.turn, 10),
+            status: '게임 완료 (최종 결산)',
+            lastAction: '최종 결산 보고서'
+        });
+    });
+
+    // 💡 강제 퇴장 이벤트
+    socket.on('kicked', () => {
+        alert("운영자에 의해 세션에서 퇴장 처리되었습니다.");
+        location.reload();
+    });
+
+    // 💡 세션 전체 초기화 이벤트
+    socket.on('session_reset', () => {
+        alert("운영자가 게임 세션을 초기화했습니다. 시작 화면으로 돌아갑니다.");
+        location.reload();
+    });
+
     function processAdminTurn() {
+        if (gameState.turn >= gameState.maxTurns) {
+            showResult();
+            return;
+        }
+
         gameState.turn++;
         gameState.turnRevenue = 0; gameState.turnExpense = 0;
         gameState.actionsThisTurn = 0; gameState.turnAppliedCodes = [];
         gameState.investedThisTurn = false; 
-
-        if (gameState.turn > gameState.maxTurns) { showResult(); return; }
 
         let oldBalanceBeforeInflow = gameState.balance;
         let baseInflow = 10000000 + (gameState.trust * 200000);
@@ -756,6 +799,7 @@
     }
 
     function showResult() {
+        document.getElementById("turn-modal").classList.add("hidden");
         document.getElementById("game-screen").classList.add("hidden");
         document.getElementById("result-screen").classList.remove("hidden");
 
