@@ -6,7 +6,7 @@
     <script src="/socket.io/socket.io.js"></script>
     <style>
         body { font-family: 'Pretendard Variable', sans-serif; background: #F4F7FB; padding: 20px; color: #111827; }
-        .container { max-width: 1300px; margin: 0 auto; background: #FFFFFF; padding: 25px; border-radius: 12px; border: 2px solid #D1D5DB; box-shadow: 0 4px 14px rgba(0,0,0,0.05); }
+        .container { max-width: 1400px; margin: 0 auto; background: #FFFFFF; padding: 25px; border-radius: 12px; border: 2px solid #D1D5DB; box-shadow: 0 4px 14px rgba(0,0,0,0.05); }
         h1 { margin-top: 0; color: #0055FF; font-weight: 900; letter-spacing: -0.5px; }
         .control-panel { margin-bottom: 20px; padding: 15px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         input { padding: 10px; font-size: 15px; border: 1px solid #CBD5E1; border-radius: 8px; outline: none; }
@@ -24,7 +24,7 @@
         th { background: #0055FF; color: white; font-weight: 700; }
         td { background: #FFFFFF; }
         .action-container { display: flex; gap: 12px; margin-top: 20px; }
-        .btn-next { background: #0055FF; color: white; flex: 2; padding: 16px; font-size: 18px; font-weight: 900; cursor: pointer; border-radius: 10px; }
+        .btn-next { background: #0055FF; color: white; flex: 2; padding: 16px; font-size: 18px; font-weight: 900; cursor: pointer; border-radius: 10px; transition: 0.3s; }
         .btn-end-game { background: #1E293B; color: #FFFFFF; flex: 1; padding: 16px; font-size: 17px; font-weight: 900; cursor: pointer; border-radius: 10px; }
         .btn-kick { background: #EF4444; color: white; padding: 6px 10px; font-size: 12px; border-radius: 6px; border: none; font-weight: bold; }
     </style>
@@ -38,7 +38,7 @@
             <input type="text" id="sessionCode" placeholder="예: 777">
             <button onclick="connectAdmin()">국방망 대시보드 접속</button>
             <button class="btn-reset" onclick="resetSession()">🔄 세션 전체 초기화</button>
-            <span style="font-size: 13px; color: #64748B; margin-left: auto;">* 4~8분기에만 개별 관서에 '추경'을 부여할 수 있습니다.</span>
+            <span style="font-size: 13px; color: #64748B; margin-left: auto;">* 4~8분기는 턴 시작 전 운영자의 추경 할당 대기 상태가 됩니다.</span>
         </div>
 
         <table>
@@ -46,7 +46,8 @@
                 <tr>
                     <th>관서(참여자) 정보</th>
                     <th>회계 분기</th>
-                    <th>가용 세출예산 / 집행률</th>
+                    <th>총 가용 세출예산 / 집행률</th>
+                    <th>실제 사용가능 (고정비 제외)</th>
                     <th>가동률 / 불용·감사</th>
                     <th>최근 지출결의</th>
                     <th>결산 상태</th>
@@ -54,7 +55,7 @@
                 </tr>
             </thead>
             <tbody id="player-list">
-                <tr><td colspan="7" style="color: #64748B;">세션에 접속하여 예산 통제 대기 중...</td></tr>
+                <tr><td colspan="8" style="color: #64748B;">세션에 접속하여 예산 통제 대기 중...</td></tr>
             </tbody>
         </table>
 
@@ -78,7 +79,10 @@
             alert(`[${currentSession}] 세션 예산 통제를 시작합니다.`);
         }
 
-        socket.on('update_dashboard', (players) => {
+        socket.on('update_dashboard', (data) => {
+            const players = data.players || data;
+            const phase = data.phase || 'playing';
+            
             const tbody = document.getElementById("player-list");
             tbody.innerHTML = "";
             let allDone = true, playerCount = 0, allAtTurnTen = true, activeCount = 0;
@@ -93,9 +97,12 @@
                     if (p.status !== '결산 마감 (대기중)') allDone = false;
                 }
                 
-                let statusColor = p.status.includes('결산 마감') ? '#0055FF' : (p.status.includes('사고') || p.status.includes('끊김') ? '#EF4444' : '#111827');
+                let statusColor = p.status.includes('결산 마감') || p.status.includes('추경') ? '#0055FF' : (p.status.includes('사고') || p.status.includes('끊김') ? '#EF4444' : '#111827');
                 let execRate = p.execRate !== undefined ? p.execRate.toFixed(1) : "0.0";
                 
+                // 실제 사용가능 금액 기반 추경 요망 판별 (< 1000만)
+                let availCash = p.availableCash || 0;
+                let needsSupp = availCash < 10000000 ? `<span style="color:#EF4444; font-weight:bold; font-size:12px;">🚨 추경 요망</span>` : `<span style="color:#10B981; font-size:12px;">✅ 안정적</span>`;
                 let canGrant = (p.turn >= 4 && p.turn <= 8 && !p.status.includes('사고'));
 
                 tbody.innerHTML += `
@@ -103,11 +110,12 @@
                         <td><b>${p.rank} ${p.name}</b><br><small style="color:#64748B;">${p.milId}</small></td>
                         <td><b>${p.turn}</b> / 10 분기</td>
                         <td><span style="color:#0055FF; font-weight:900;">${Number(p.balance).toLocaleString()} ₩</span><br><small style="font-weight:bold; color:#10B981;">(집행률: ${execRate}%)</small></td>
+                        <td style="background:${availCash < 0 ? '#FEF2F2' : '#FFFFFF'};"><span style="font-weight:900; color:${availCash < 0 ? '#EF4444' : '#111827'};">${Number(availCash).toLocaleString()} ₩</span><br>${needsSupp}</td>
                         <td><span style="color:#0055FF; font-weight:bold;">${p.trust}%</span> / <span style="color:${p.debt > 30 ? '#EF4444' : '#111827'}">${p.debt}%</span></td>
                         <td>${p.lastAction || '-'}</td>
                         <td style="color:${statusColor}; font-weight:bold;">${p.status}</td>
                         <td>
-                            <button class="btn-grant" onclick="grantBudget('${id}', '${p.name}')" ${canGrant ? '' : 'disabled'}>추경</button>
+                            <button class="btn-grant" onclick="grantBudget('${id}', '${p.name}')" ${canGrant ? '' : 'disabled'}>개별 추경</button>
                             <button class="btn-kick" onclick="kickPlayer('${id}')">해제</button>
                         </td>
                     </tr>
@@ -116,14 +124,23 @@
 
             const btnNext = document.getElementById("btn-next-turn");
             if (playerCount === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" style="color: #64748B;">현재 접속 중인 관서가 없습니다.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" style="color: #64748B;">현재 접속 중인 관서가 없습니다.</td></tr>`;
                 btnNext.style.background = "#94A3B8"; btnNext.innerText = "전 관서 일괄 다음 분기 진행 ➡️";
+                btnNext.onclick = forceNextTurn;
             } else if (allAtTurnTen && activeCount > 0) {
                 btnNext.style.background = "#0055FF"; btnNext.innerText = "🏆 10분기 완료! [재정 종합 결산 진행] ➡️";
+                btnNext.onclick = forceNextTurn;
+            } else if (phase === 'waiting_supp') {
+                // 💡 서버가 추경 대기 상태일 때, 버튼 역할 교체
+                btnNext.style.background = "#10B981"; 
+                btnNext.innerText = "✅ 개별 추경 완료 및 본예산 집행 시작 (게임 재개) ➡️";
+                btnNext.onclick = () => { socket.emit('start_execution', currentSession); };
             } else if (allDone) {
-                btnNext.style.background = "#10B981"; btnNext.innerText = "✅ 전 관서 대기 완료! 다음 분기 진행 ➡️";
+                btnNext.style.background = "#0055FF"; btnNext.innerText = "✅ 전 관서 대기 완료! 다음 분기 진행 ➡️";
+                btnNext.onclick = forceNextTurn;
             } else {
                 btnNext.style.background = "#0055FF"; btnNext.innerText = "⏳ 예산 집행 진행 중... 강제 다음 분기 진행 ➡️";
+                btnNext.onclick = forceNextTurn;
             }
         });
 
@@ -134,6 +151,7 @@
                 let amount = parseInt(amountStr);
                 if (!isNaN(amount) && amount > 0) {
                     socket.emit('admin_grant_budget', { sessionCode: currentSession, targetId: socketId, amount: amount });
+                    alert(`${playerName} 관서에 ${amount.toLocaleString()} ₩ 추경 예산이 배정되었습니다.`);
                 } else {
                     alert("올바른 금액을 입력하세요.");
                 }
@@ -141,12 +159,12 @@
         }
 
         function forceNextTurn() {
-            if (!currentSession) return alert("세션에 먼저 접속하세요.");
-            if (confirm("진행 중인 분기를 마감하고 다음 분기로 넘기시겠습니까?")) socket.emit('force_next_turn', currentSession);
+            if (!currentSession) return alert("세션에 접속하세요.");
+            if (confirm("진행 중인 분기를 마감하고 다음 분기(또는 추경 검토)로 넘기시겠습니까?")) socket.emit('force_next_turn', currentSession);
         }
 
         function forceEndGame() {
-            if (!currentSession) return alert("세션에 먼저 접속하세요.");
+            if (!currentSession) return alert("세션에 접속하세요.");
             if (confirm("모든 관서의 집행을 즉시 중단하고 종합 결산으로 넘기시겠습니까?")) socket.emit('force_end_game', currentSession);
         }
 
@@ -155,7 +173,7 @@
         }
 
         function resetSession() {
-            if (!currentSession) return alert("세션 번호를 입력하고 접속하세요.");
+            if (!currentSession) return alert("세션 번호를 입력하세요.");
             if (confirm(`세션의 모든 참가자를 내보내고 초기화하시겠습니까?`)) socket.emit('reset_session', currentSession);
         }
     </script>

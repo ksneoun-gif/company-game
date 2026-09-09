@@ -10,20 +10,16 @@
 
     <style>
         :root { --bg-color: #F4F7FB; --black: #111827; --blue: #0055FF; --blue-light: #E5EFFF; --blue-hover: #0044CC; --gray-light: #F8FAFC; --gray-border: #E2E8F0; --red: #EF4444; --white: #FFFFFF; }
-        
-        /* 💡 모바일 스크롤 잘림 버그 해결: display를 block으로 변경하고 margin auto 적용 */
         body { font-family: 'Pretendard Variable', sans-serif; background-color: var(--bg-color); color: var(--black); display: block; margin: 0; padding: 20px 15px; box-sizing: border-box; }
         .container { background: var(--white); padding: 24px; border-radius: 16px; border: 1px solid var(--gray-border); box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 100%; max-width: 850px; box-sizing: border-box; position: relative; margin: 0 auto 20px auto; }
         
         h1, h2, h3, h4 { font-family: 'GmarketSans', sans-serif; text-align: center; margin-top: 0; color: var(--black); }
         
-        /* 💡 예산 집행률을 포함한 5개 반응형 대시보드 */
         .dashboard { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; background: var(--gray-light); padding: 16px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--gray-border); }
         .stat-box { text-align: center; font-size: 13px; font-weight: 700; color: #475569; display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--white); padding: 10px 5px; border-radius: 8px; border: 1px solid var(--gray-border); box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
         .stat-value { font-size: 17px; color: var(--black); display: block; margin-top: 6px; font-weight: 900; word-break: keep-all; }
         .stat-value.money { color: var(--blue); }
 
-        /* 💡 고정비 그리드 스타일 추가 (버그 해결) */
         .expense-board { background: var(--white); border: 1px solid var(--gray-border); padding: 16px; border-radius: 12px; margin-bottom: 16px; font-size: 14px; font-weight: 700; }
         .expense-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
         .expense-item { display: flex; justify-content: space-between; padding-bottom: 6px; border-bottom: 1px dashed #CBD5E1; align-items: center; }
@@ -39,7 +35,6 @@
         .tab-btn { background: var(--white); color: #64748B; border: 1px solid var(--gray-border); padding: 12px 14px; border-radius: 10px; cursor: pointer; font-weight: 800; font-size: 14px; white-space: nowrap; transition: 0.2s; flex-shrink: 0; }
         .tab-btn.active { background: var(--blue); color: var(--white); border-color: var(--blue); }
 
-        /* 💡 탭 스크롤 독립 설정 (vh 대신 px 사용) */
         .card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; max-height: 380px; overflow-y: auto; margin-bottom: 15px; padding: 10px; background: var(--gray-light); border-radius: 12px; border: 1px solid var(--gray-border); overscroll-behavior: contain; }
         .sub-category-title { grid-column: 1 / -1; font-weight: 900; font-size: 14px; color: var(--blue); border-bottom: 2px solid var(--blue); padding-bottom: 6px; margin-top: 10px; }
         
@@ -73,11 +68,11 @@
         }
 
         @media (max-width: 600px) { 
-            .container { padding: 18px 14px; }
+            .container { padding: 18px 14px; margin: 0 auto; }
             .dashboard { grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 12px; }
-            .dashboard .stat-box:first-child { grid-column: 1 / -1; } /* 총 예산은 가로 전체 차지 */
-            .expense-grid { grid-template-columns: 1fr; gap: 8px; } /* 모바일 고정비 1열 */
-            .card-grid { grid-template-columns: 1fr; padding: 8px; } 
+            .dashboard .stat-box:first-child { grid-column: 1 / -1; } 
+            .expense-grid { grid-template-columns: 1fr; gap: 8px; } 
+            .card-grid { grid-template-columns: 1fr; padding: 8px; max-height: 48vh;} 
             .input-group { grid-template-columns: 1fr; gap: 10px; }
             .action-buttons { flex-direction: column; gap: 10px; }
             .stat-value { font-size: 16px; }
@@ -119,12 +114,13 @@
         <div class="status-badge">현재 분기: <span id="current-turn">1</span> / 10 &nbsp;|&nbsp; <span style="color:var(--red);">결의 한도: <span id="actions-left">4</span> / 4</span></div>
     </div>
 
+    <!-- 💡 예산 집행률 포함 5칸 대시보드 구조 복구 -->
     <div class="dashboard">
         <div class="stat-box">총 가용 세출예산<span class="stat-value money" id="val-balance"></span></div>
         <div class="stat-box" style="border: 2px solid #10B981; background: #ECFDF5;">실제 사용가능<br><small style="font-size:10px; color:#10B981;">(예산 - 고정비)</small><span class="stat-value" id="val-available" style="color: #10B981;">0 ₩</span></div>
         <div class="stat-box">예산 집행률<span class="stat-value" id="val-exec">0.0 %</span></div>
-        <div class="stat-box">전투 가동률<span class="stat-value" id="val-trust">50 %</span></div>
-        <div class="stat-box">감사 리스크<span class="stat-value" id="val-debt" style="color: var(--red);">20 %</span></div>
+        <div class="stat-box">전투 가동률<span class="stat-value" id="val-trust">45 %</span></div>
+        <div class="stat-box">감사/불용 리스크<span class="stat-value" id="val-debt" style="color: var(--red);">30 %</span></div>
     </div>
 
     <div class="expense-board">
@@ -133,7 +129,7 @@
     </div>
 
     <div class="log-area" id="game-log">
-        <span class="log-turn">[시스템]</span> 총 1억원의 초기 예산이 배정되었습니다.<br>
+        <span class="log-turn">[시스템]</span> 총 7,500만원의 초기 예산이 배정되었습니다.<br>
         <span style="color:#10B981; font-weight:bold;">💡 [지출관 지침]</span> 420-01 기본조사설계비 선행 후 시설공사 발주가 가능합니다.<br>
     </div>
 
@@ -149,6 +145,15 @@
     <div class="action-buttons">
         <button class="btn-undo" id="btn-undo" onclick="undoLastAction()" disabled>🔙 직전 결의 취소</button>
         <button class="btn-end" id="btn-end" onclick="endTurn()">결산 및 당기 분기 마감</button>
+    </div>
+</div>
+
+<!-- 💡 추경 편성 대기 모달 -->
+<div id="supp-modal" class="modal-overlay hidden">
+    <div class="container" style="max-width: 400px; padding: 30px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; margin: auto;">
+        <h2 style="color: var(--blue); margin-bottom: 15px; font-size: 22px; font-weight: 900;">⏳ 국방부 추경 편성 대기</h2>
+        <p style="font-size: 15px; font-weight: 600; color: #475569; line-height: 1.6;">상급부대에서 특별 추경 예산을 검토 중입니다.<br>승인 및 교부가 완료될 때까지 대기해 주십시오.</p>
+        <div id="supp-msg-area" style="margin-top: 20px; font-weight: 900; color: #10B981; font-size: 16px; min-height: 24px;"></div>
     </div>
 </div>
 
@@ -180,7 +185,7 @@
 </div>
 
 <div id="turn-modal" class="modal-overlay hidden">
-    <div class="container" style="max-width: 400px; padding: 25px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+    <div class="container" style="max-width: 400px; padding: 25px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.3); margin: auto;">
         <h2 id="modal-title" style="color: var(--blue); margin-bottom: 15px; font-size: 20px; font-weight: 900;"></h2>
         <div id="modal-content" style="text-align: left; font-size: 14px;"></div>
         <button class="btn-apply" onclick="closeTurnModal()" style="margin-top: 15px; font-size: 15px;">확인 후 집행 시작</button>
@@ -199,19 +204,18 @@
         // Tab 1: 예산 편성 및 여비
         "1001": { tab: 'tab1', sub: '예산 전용 및 배정', name: "분기 세출예산 당겨쓰기", desc: "예산 +3천만 / 매턴 감사페널티 +150만", effect: (s) => { s.balance += 30000000; s.totalAllocated += 30000000; s.debt += 15; s.expenses["감사/불용 페널티"] += 1500000; s.hasShortLoan += 1; } },
         "1002": { tab: 'tab1', sub: '예산 전용 및 배정', name: "당겨쓴 예산 정산보고", desc: "🔒[보유시] 예산 -3천만 / 페널티 감소", condition: (s) => s.hasShortLoan > 0, lockMsg: "당겨쓴 내역 없음", effect: (s) => { s.balance -= 30000000; s.debt = Math.max(0, s.debt - 15); s.expenses["감사/불용 페널티"] = Math.max(0, s.expenses["감사/불용 페널티"] - 1500000); s.hasShortLoan -= 1; } },
-        "1003": { tab: 'tab1', sub: '보수 집행 (110)', name: "[110-01] 성과상여금 적기 지급", desc: "예산 -5백만 / 가동률(사기) +5%", effect: (s) => { s.balance -= 5000000; s.trust += 5; } },
-        "1004": { tab: 'tab1', sub: '보수 집행 (110)', name: "[110-01] 명절휴가비 일괄 지급", desc: "예산 -8백만 / 가동률(사기) +8%", effect: (s) => { s.balance -= 8000000; s.trust += 8; } },
-        "1005": { tab: 'tab1', sub: '보수 집행 (110)', name: "[110-01] 비행수당 인상분 반영", desc: "예산 -3백만 / 조종사 유출 방지 (리스크-3)", effect: (s) => { s.balance -= 3000000; s.debt = Math.max(0, s.debt - 3); } },
-        "1006": { tab: 'tab1', sub: '보수 집행 (110)', name: "[110-01] 야간 정비 시간외근무수당", desc: "예산 -6백만 / 정비 가동률 +5%", effect: (s) => { s.balance -= 6000000; s.trust += 5; } },
-        "1007": { tab: 'tab1', sub: '보수 집행 (110)', name: "[110-01] 연가보상비 적법 지급", desc: "예산 -7백만 / 민원 리스크 -5%", effect: (s) => { s.balance -= 7000000; s.debt = Math.max(0, s.debt - 5); } },
-        "1008": { tab: 'tab1', sub: '보수 집행 (110)', name: "[110-01] 무장특기 위험근무수당", desc: "예산 -2백만 / 무장태세 가동률 +3%", effect: (s) => { s.balance -= 2000000; s.trust += 3; } },
-        "1009": { tab: 'tab1', sub: '보수 집행 (110)', name: "[110-02] 전문임기제(군무원) 보수", desc: "예산 -4백만 / 행정 효율 리스크 -4%", effect: (s) => { s.balance -= 4000000; s.debt = Math.max(0, s.debt - 4); } },
-        "1010": { tab: 'tab1', sub: '여비 (220)', name: "[220-01] 관내출장(근거리) 여비", desc: "예산 -1백만 / 업무 공백 리스크 -1%", effect: (s) => { s.balance -= 1000000; s.debt = Math.max(0, s.debt - 1); } },
-        "1011": { tab: 'tab1', sub: '여비 (220)', name: "[220-01] 공중기동기(C-130) 파견여비", desc: "예산 -3백만 / 파견작전 가동률 +3%", effect: (s) => { s.balance -= 3000000; s.trust += 3; } },
-        "1012": { tab: 'tab1', sub: '여비 (220)', name: "[220-01] 영공방위 합동훈련 파견여비", desc: "예산 -5백만 / 훈련 가동률 +5%", effect: (s) => { s.balance -= 5000000; s.trust += 5; } },
-        "1013": { tab: 'tab1', sub: '여비 (220)', name: "[220-01] 전입/전출자 이전비 지원", desc: "예산 -2백만 / 부대원 복지 (가동률 +2%)", effect: (s) => { s.balance -= 2000000; s.trust += 2; } },
-        "1014": { tab: 'tab1', sub: '여비 (220)', name: "[220-02] 해외 FMS 장비검수 국외출장", desc: "예산 -8백만 / 조달 신뢰 (가동률 +8%)", effect: (s) => { s.balance -= 8000000; s.trust += 8; } },
-        "1015": { tab: 'tab1', sub: '여비 (220)', name: "[220-03] 美 전투기 시뮬레이터 국외교육", desc: "예산 -1.2천만 / 조종사 기량 +12%", effect: (s) => { s.balance -= 12000000; s.trust += 12; } },
+        "1003": { tab: 'tab1', sub: '특근/운영비 (210/240)', name: "[210-16] 우수 조종사/정비사 격려금", desc: "예산 -5백만 / 가동률(사기) +5%", effect: (s) => { s.balance -= 5000000; s.trust += 5; } },
+        "1004": { tab: 'tab1', sub: '특근/운영비 (210/240)', name: "[210-16] 체육대회(전투지휘검열) 포상금", desc: "예산 -8백만 / 가동률(사기) +8%", effect: (s) => { s.balance -= 8000000; s.trust += 8; } },
+        "1005": { tab: 'tab1', sub: '특근/운영비 (210/240)', name: "[210-05] 야간비행대기 특근매식비", desc: "예산 -3백만 / 피로 불만 방지 (리스크-3)", effect: (s) => { s.balance -= 3000000; s.debt = Math.max(0, s.debt - 3); } },
+        "1006": { tab: 'tab1', sub: '특근/운영비 (210/240)', name: "[210-06] 지휘통제실 철야 당직비", desc: "예산 -6백만 / 지휘 가동률 +5%", effect: (s) => { s.balance -= 6000000; s.trust += 5; } },
+        "1007": { tab: 'tab1', sub: '특근/운영비 (210/240)', name: "[240-01] 주요 작전 유공자 격려 간담회", desc: "예산 -7백만 / 민원 리스크 -5%", effect: (s) => { s.balance -= 7000000; s.debt = Math.max(0, s.debt - 5); } },
+        "1008": { tab: 'tab1', sub: '특근/운영비 (210/240)', name: "[210-04] 영내 식당 특식 지원비", desc: "예산 -2백만 / 부대사기 가동률 +3%", effect: (s) => { s.balance -= 2000000; s.trust += 3; } },
+        "1009": { tab: 'tab1', sub: '여비 (220)', name: "[220-01] 관내출장(근거리) 여비", desc: "예산 -1백만 / 업무 공백 리스크 -1%", effect: (s) => { s.balance -= 1000000; s.debt = Math.max(0, s.debt - 1); } },
+        "1010": { tab: 'tab1', sub: '여비 (220)', name: "[220-01] 공중기동기(C-130) 파견여비", desc: "예산 -3백만 / 파견작전 가동률 +3%", effect: (s) => { s.balance -= 3000000; s.trust += 3; } },
+        "1011": { tab: 'tab1', sub: '여비 (220)', name: "[220-01] 영공방위 합동훈련 파견여비", desc: "예산 -5백만 / 훈련 가동률 +5%", effect: (s) => { s.balance -= 5000000; s.trust += 5; } },
+        "1012": { tab: 'tab1', sub: '여비 (220)', name: "[220-01] 전입/전출자 이전비 지원", desc: "예산 -2백만 / 부대원 복지 (가동률 +2%)", effect: (s) => { s.balance -= 2000000; s.trust += 2; } },
+        "1013": { tab: 'tab1', sub: '여비 (220)', name: "[220-02] 해외 FMS 장비검수 국외출장", desc: "예산 -8백만 / 조달 신뢰 (가동률 +8%)", effect: (s) => { s.balance -= 8000000; s.trust += 8; } },
+        "1014": { tab: 'tab1', sub: '여비 (220)', name: "[220-03] 美 전투기 시뮬레이터 국외교육", desc: "예산 -1.2천만 / 조종사 기량 +12%", effect: (s) => { s.balance -= 12000000; s.trust += 12; } },
 
         // Tab 2: 전력 인프라 구축 (420, 430)
         "2001": { tab: 'tab2', sub: '시설공사 (420)', name: "[420-01] 활주로 전면재포장 기본조사설계", isOneTime: true, desc: "예산 -1.5천만 / 🌟실시설계 해금", effect: (s) => { s.balance -= 15000000; s.hasBasicDesign = true; } },
@@ -227,7 +231,7 @@
         "2011": { tab: 'tab2', sub: '자산취득 (430)', name: "[430-01] 조종사 LVC 시뮬레이터 시스템", isOneTime: true, desc: "예산 -3.5천만 / 훈련 가동률 +20%", effect: (s) => { s.balance -= 35000000; s.trust += 20; } },
         "2012": { tab: 'tab2', sub: '자산취득 (430)', name: "[430-01] 폭발물 처리(EOD) 로봇 도입", isOneTime: true, desc: "예산 -1.8천만 / 폭발 사고 리스크 -15%", effect: (s) => { s.balance -= 18000000; s.debt = Math.max(0, s.debt - 15); } },
         "2013": { tab: 'tab2', sub: '자산취득 (430)', name: "[430-01] 항공기 견인차(토윙카) 구매", isOneTime: true, desc: "예산 -1.4천만 / 정비 가동률 +10%", effect: (s) => { s.balance -= 14000000; s.trust += 10; } },
-        "2014": { tab: 'tab2', sub: '자산취득 (430)', name: "[430-01] 재무/회계부서 전산장비(PC) 전면교체", isOneTime: true, desc: "예산 -1천만 / 🌟행정업무 200만 고정비절감", effect: (s) => { s.balance -= 10000000; s.expenses["부대운영/추진비 (210,240)"] = Math.max(0, s.expenses["부대운영/추진비 (210,240)"] - 2000000); s.trust += 5; } },
+        "2014": { tab: 'tab2', sub: '자산취득 (430)', name: "[430-01] 재무/회계부서 전산장비(PC) 전면교체", isOneTime: true, desc: "예산 -1천만 / 🌟행정업무 100만 고정비절감", effect: (s) => { s.balance -= 10000000; s.expenses["부대운영/추진비 (210,240)"] = Math.max(0, s.expenses["부대운영/추진비 (210,240)"] - 1000000); s.trust += 5; } },
         "2015": { tab: 'tab2', sub: '자산취득 (430)', name: "[430-01] 공군항공과학고 실습기자재 지원", desc: "예산 -3백만 / 군 전문인력 확보 (가동률+3%)", effect: (s) => { s.balance -= 3000000; s.trust += 3; } },
 
         // Tab 3: 작전 및 훈련 수행
@@ -275,19 +279,21 @@
         "4020": { tab: 'tab4', sub: '재정 효율 (구체화)', name: "[210-16] 부서운영비 및 격려금 강제 삭감 (불용방지)", desc: "예산 0 / 고정비 100만 감소 / ⚠️가동률-10", effect: (s) => { s.expenses["부대운영/추진비 (210,240)"] = Math.max(0, s.expenses["부대운영/추진비 (210,240)"] - 1000000); s.trust = Math.max(0, s.trust - 10); } }
     };
 
+    // 💡 밸런스 설정값 (7,500만 / 가동률 45% / 리스크 30%)
     const gameState = {
         session: "", milId: "", rank: "", name: "", turn: 1, maxTurns: 10, 
-        balance: 100000000, trust: 50, debt: 20,
-        totalAllocated: 100000000, 
+        balance: 75000000, trust: 45, debt: 30,
+        totalAllocated: 75000000, 
         eventTurn: Math.floor(Math.random() * 5) + 4,
         isCrisisEvent: Math.random() < 0.7,
         hasBasicDesign: false, hasDetailDesign: false, hasShortLoan: 0, hasLongLoan: 0,
+        // 💡 고정비 비중 상향 (2,300만 시작)
         expenses: {
-            "항공유류비 (210-11)": 12000000,
-            "시설장비유지비 (210-09)": 6000000,
-            "일반수용비 (210-01)": 3000000,
-            "피복/급식비 (210-03,04)": 2000000,
-            "부대운영/추진비 (210,240)": 2000000,
+            "항공유류비 (210-11)": 10000000,
+            "시설장비유지비 (210-09)": 5000000,
+            "일반수용비 (210-01)": 2500000,
+            "피복/급식비 (210-03,04)": 1500000,
+            "부대운영/추진비 (210,240)": 1000000,
             "감사/불용 페널티": 0
         },
         pendingEvents: [], currentTab: 'tab1',
@@ -457,7 +463,9 @@
 
         socket.emit('update_state', {
             balance: gameState.balance, trust: gameState.trust, debt: gameState.debt,
-            execRate: calculateExecutionRate(gameState.balance), lastAction: action.name
+            execRate: calculateExecutionRate(gameState.balance),
+            availableCash: gameState.balance - getAdjustedExpenseTotal(),
+            lastAction: action.name
         });
     }
 
@@ -473,7 +481,9 @@
 
         socket.emit('update_state', {
             balance: gameState.balance, trust: gameState.trust, debt: gameState.debt,
-            execRate: calculateExecutionRate(gameState.balance), lastAction: '결의 취소'
+            execRate: calculateExecutionRate(gameState.balance),
+            availableCash: gameState.balance - getAdjustedExpenseTotal(),
+            lastAction: '결의 취소'
         });
     }
 
@@ -542,12 +552,14 @@
         socket.emit('update_state', {
             balance: gameState.balance, trust: gameState.trust, debt: gameState.debt,
             execRate: calculateExecutionRate(gameState.balance),
+            availableCash: gameState.balance - getAdjustedExpenseTotal(),
             turn: Math.min(gameState.turn, 10),
             status: isLastTurn ? '10분기 최종 마감 (결산 대기)' : '결산 마감 (대기중)',
             lastAction: isLastTurn ? '출납폐쇄 마감' : '분기 마감 확정'
         });
     }
 
+    // 💡 동기화 및 이벤트 수신 로직
     socket.on('sync_turn', (serverTurn) => {
         if (gameState.turn < serverTurn) {
             gameState.turn = serverTurn;
@@ -555,19 +567,43 @@
         }
     });
 
+    // 💡 [추가] 4~8턴에 진입할 때 서버로부터 '추경 대기' 신호 수신
+    socket.on('wait_for_supp_budget', (serverTurn) => {
+        if (gameState.balance < 0) return; // 파산자는 예외
+        gameState.turn = serverTurn;
+        document.getElementById("supp-msg-area").innerText = "";
+        document.getElementById("supp-modal").classList.remove("hidden");
+        
+        socket.emit('update_state', {
+            balance: gameState.balance, trust: gameState.trust, debt: gameState.debt,
+            execRate: calculateExecutionRate(gameState.balance),
+            availableCash: gameState.balance - getAdjustedExpenseTotal(),
+            turn: gameState.turn, status: '추경 검토 대기중', lastAction: '대기'
+        });
+    });
+
     socket.on('receive_special_budget', (data) => {
         gameState.balance += data.amount;
         gameState.totalAllocated += data.amount; 
         addLog(`<br><span style="color:var(--blue); font-weight:900; font-size:14px;">[국방부 긴급 자금 배정] 특별 추경 예산 ${formatMoney(data.amount)}이(가) 수혈되었습니다!</span>`);
+        
+        const suppMsg = document.getElementById("supp-msg-area");
+        if(suppMsg) suppMsg.innerText = `✅ 특별 추경 예산 ${formatMoney(data.amount)} 수령 완료!`;
+
         updateUI();
         socket.emit('update_state', {
             balance: gameState.balance, trust: gameState.trust, debt: gameState.debt,
-            execRate: calculateExecutionRate(gameState.balance), lastAction: '추경 수령'
+            execRate: calculateExecutionRate(gameState.balance),
+            availableCash: gameState.balance - getAdjustedExpenseTotal(),
+            lastAction: '추경 수령'
         });
     });
 
     socket.on('trigger_next_turn', (serverTurn) => {
         if (gameState.balance < 0) return;
+
+        // 대기 모달이 켜져있다면 숨김
+        document.getElementById("supp-modal").classList.add("hidden");
 
         if (serverTurn > 10) {
             showResult();
@@ -585,6 +621,7 @@
         socket.emit('update_state', {
             balance: gameState.balance, trust: gameState.trust, debt: gameState.debt,
             execRate: calculateExecutionRate(gameState.balance),
+            availableCash: gameState.balance - getAdjustedExpenseTotal(),
             turn: gameState.turn, status: '예산 집행 중', lastAction: `${gameState.turn}분기 시작`
         });
     });
@@ -600,10 +637,8 @@
     function processAdminTurn() {
         gameState.actionsThisTurn = 0; gameState.turnAppliedCodes = [];
         
-        gameState.trust = Math.max(0, gameState.trust - 5); 
-        gameState.debt = Math.min(100, gameState.debt + 2);
-
-        let baseInflow = 20000000;
+        // 💡 1800만으로 조정
+        let baseInflow = 18000000;
         gameState.balance += baseInflow;
         gameState.totalAllocated += baseInflow;
         
