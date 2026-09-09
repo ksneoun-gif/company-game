@@ -72,11 +72,8 @@
         
         let currentSession = "";
 
-        // 💡 [버그 2 해결] 서버 재기동 혹은 연결 불안정 시 관제망 강제 재접속
         socket.on('connect', () => {
-            if (currentSession) {
-                socket.emit('join_game', { sessionCode: currentSession, isOperator: true });
-            }
+            if (currentSession) socket.emit('join_game', { sessionCode: currentSession, isOperator: true });
         });
 
         function connectAdmin() {
@@ -104,7 +101,7 @@
                     if (p.status !== '결산 마감 (대기중)') allDone = false;
                 }
                 
-                let statusColor = p.status.includes('결산 마감') || p.status.includes('추경') ? '#0055FF' : (p.status.includes('사고') || p.status.includes('끊김') ? '#EF4444' : '#111827');
+                let statusColor = p.status.includes('대기중') || p.status.includes('마감') ? '#0055FF' : (p.status.includes('사고') || p.status.includes('끊김') ? '#EF4444' : '#111827');
                 let execRate = p.execRate !== undefined ? Number(p.execRate).toFixed(1) : "0.0";
                 let availCash = p.availableCash || 0;
                 let needsSupp = availCash < 10000000 ? `<span style="color:#EF4444; font-weight:bold; font-size:12px;">🚨 추경 요망</span>` : `<span style="color:#10B981; font-size:12px;">✅ 안정적</span>`;
@@ -132,8 +129,11 @@
                 tbody.innerHTML = `<tr><td colspan="8" style="color: #64748B;">현재 접속 중인 관서가 없습니다.</td></tr>`;
                 btnNext.style.background = "#94A3B8"; btnNext.innerText = "전 관서 일괄 다음 분기 진행 ➡️";
                 btnNext.onclick = forceNextTurn;
+            } else if (phase === 'ended') {
+                btnNext.style.background = "#10B981"; btnNext.innerText = "📁 파일 저장 완료. 게임 종료";
+                btnNext.onclick = null;
             } else if (allAtTurnTen && activeCount > 0) {
-                btnNext.style.background = "#0055FF"; btnNext.innerText = "🏆 10분기 완료! [재정 종합 결산 진행] ➡️";
+                btnNext.style.background = "#1E293B"; btnNext.innerText = "🏆 10분기 마감 완료! [출납폐쇄 및 파일 저장] ➡️";
                 btnNext.onclick = forceNextTurn;
             } else if (phase === 'waiting_supp') {
                 btnNext.style.background = "#10B981"; 
@@ -155,7 +155,6 @@
                 let amount = parseInt(amountStr);
                 if (!isNaN(amount) && amount > 0) {
                     socket.emit('admin_grant_budget', { sessionCode: currentSession, targetId: socketId, amount: amount });
-                    alert(`${playerName} 관서에 ${amount.toLocaleString()} ₩ 추경 예산이 배정되었습니다.`);
                 } else {
                     alert("올바른 금액을 입력하세요.");
                 }
@@ -169,7 +168,7 @@
 
         function forceEndGame() {
             if (!currentSession) return alert("세션에 접속하세요.");
-            if (confirm("모든 관서의 집행을 즉시 중단하고 종합 결산으로 넘기시겠습니까?")) socket.emit('force_end_game', currentSession);
+            if (confirm("모든 관서의 집행을 즉시 중단하고 종합 결산(파일 저장)으로 넘기시겠습니까?")) socket.emit('force_end_game', currentSession);
         }
 
         function kickPlayer(socketId) {

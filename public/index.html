@@ -56,17 +56,14 @@
 
         .hidden { display: none !important; }
         .status-badge { background: var(--blue-light); color: var(--blue); border: 1px solid #BFDBFE; padding: 8px 14px; border-radius: 20px; font-weight: 900; display: inline-block; margin-bottom: 16px; font-size: 14px; }
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(17, 24, 39, 0.6); z-index: 999; display: flex; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; backdrop-filter: blur(4px); }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(17, 24, 39, 0.7); z-index: 999; display: flex; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; backdrop-filter: blur(4px); }
         
         .ranking-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-weight: 700; font-size: 13px; }
         .ranking-table th, .ranking-table td { border: 1px solid var(--gray-border); padding: 10px; text-align: center; }
         .ranking-table th { background-color: var(--blue); color: var(--white); font-weight: 800; }
         .ranking-table tr.my-rank { background-color: var(--blue-light); color: var(--blue); font-weight: 900; }
 
-        @media (max-width: 800px) {
-            .dashboard { grid-template-columns: repeat(3, 1fr); }
-        }
-
+        @media (max-width: 800px) { .dashboard { grid-template-columns: repeat(3, 1fr); } }
         @media (max-width: 600px) { 
             .container { padding: 18px 14px; margin: 0 auto; }
             .dashboard { grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 12px; }
@@ -86,7 +83,7 @@
 <div id="login-screen" class="container">
     <div style="text-align: center; margin-bottom: 15px;"><span style="background: var(--blue-light); color: var(--blue); padding: 6px 14px; border-radius: 20px; font-size: 14px; font-weight: 900;">회계연도 2026</span></div>
     <h1 style="font-size: 28px; font-weight: 900; margin-bottom: 8px; color: var(--blue);">국방 예산·재정 시뮬레이션</h1>
-    <p style="text-align: center; color: #64748B; font-size: 14px; font-weight: 600;">환영합니다. 지출관(관서) 정보를 입력해주세요.</p>
+    <p style="text-align: center; color: #64748B; font-size: 14px; font-weight: 600;">지출관(관서) 정보를 입력해주세요.</p>
     
     <div style="margin-top: 30px; text-align: left;">
         <div class="input-group">
@@ -129,7 +126,7 @@
 
     <div class="log-area" id="game-log">
         <span class="log-turn">[시스템]</span> 총 7,500만원의 초기 예산이 배정되었습니다.<br>
-        <span style="color:#10B981; font-weight:bold;">💡 [지출관 지침]</span> 420-01 기본조사설계비 선행 후 시설공사 발주가 가능합니다.<br>
+        <span style="color:#10B981; font-weight:bold;">💡 [지출관 지침]</span> [420-01 기본조사설계] ➔ [420-02 실시설계] 순으로 진행해야 본공사가 해금됩니다.<br>
     </div>
 
     <div class="tab-container" id="tab-menu">
@@ -147,11 +144,14 @@
     </div>
 </div>
 
+<!-- 💡 [수정] 추경 대기 팝업 - 통신 단절을 대비한 타임아웃 안전장치 포함 -->
 <div id="supp-modal" class="modal-overlay hidden">
     <div class="container" style="max-width: 400px; padding: 30px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; margin: auto;">
         <h2 style="color: var(--blue); margin-bottom: 15px; font-size: 22px; font-weight: 900;">⏳ 국방부 추경 편성 대기</h2>
         <p style="font-size: 15px; font-weight: 600; color: #475569; line-height: 1.6;">상급부대에서 특별 추경 예산을 검토 중입니다.<br>승인 및 교부가 완료될 때까지 대기해 주십시오.</p>
         <div id="supp-msg-area" style="margin-top: 20px; font-weight: 900; color: #10B981; font-size: 16px; min-height: 24px;"></div>
+        <!-- 💡 15초 타임아웃 뒤 나타나는 비상 탈출 버튼 -->
+        <button id="btn-supp-timeout" class="btn-apply hidden" onclick="closeSuppModalForce()" style="margin-top: 20px; font-size: 14px; background: #64748B;">응답 지연 시 강제 집행 시작</button>
     </div>
 </div>
 
@@ -198,6 +198,7 @@
     let sessionPlayers = {};
     socket.on('update_dashboard', (data) => { sessionPlayers = data.players || data; });
 
+    // 💡 [버그 3 해결] 420 계열 건설공사 단계별 Lock 조건 엄격 연동 (기본설계 ➔ 실시설계 ➔ 공사/감리)
     const codeDict = {
         // Tab 1: 예산 편성 및 여비
         "1001": { tab: 'tab1', sub: '예산 전용 및 배정', name: "분기 세출예산 당겨쓰기", desc: "예산 +3천만 / 매턴 감사페널티 +150만", effect: (s) => { s.balance += 30000000; s.totalAllocated += 30000000; s.debt += 15; s.expenses["감사/불용 페널티"] += 1500000; s.hasShortLoan += 1; } },
@@ -217,12 +218,12 @@
 
         // Tab 2: 전력 인프라 구축 (420, 430)
         "2001": { tab: 'tab2', sub: '시설공사 (420)', name: "[420-01] 활주로 전면재포장 기본조사설계", isOneTime: true, desc: "예산 -1.5천만 / 🌟실시설계 해금", effect: (s) => { s.balance -= 15000000; s.hasBasicDesign = true; } },
-        "2002": { tab: 'tab2', sub: '시설공사 (420)', name: "[420-02] 비행단 주요시설 실시설계비", isOneTime: true, desc: "🔒[기본설계완료] 예산 -2천만 / 🌟공사 해금", condition: (s) => s.hasBasicDesign, lockMsg: "기본설계(420-01) 완료 필요", effect: (s) => { s.balance -= 20000000; s.hasDetailDesign = true; } },
-        "2003": { tab: 'tab2', sub: '시설공사 (420)', name: "[420-03] 주활주로 콘크리트 포장 공사", isOneTime: true, desc: "🔒[실시설계완료] 예산 -4천만 / 가동률 +20%", condition: (s) => s.hasDetailDesign, lockMsg: "설계 필수", effect: (s) => { s.balance -= 40000000; s.trust += 20; } },
-        "2004": { tab: 'tab2', sub: '시설공사 (420)', name: "[420-03] 내폭구조 이글루(격납고) 신축", isOneTime: true, desc: "🔒[실시설계완료] 예산 -3.5천만 / 생존성 가동률+15%", condition: (s) => s.hasDetailDesign, lockMsg: "설계 필수", effect: (s) => { s.balance -= 35000000; s.trust += 15; } },
-        "2005": { tab: 'tab2', sub: '시설공사 (420)', name: "[420-03] 탄약고 방폭벽 보강공사", isOneTime: true, desc: "🔒[실시설계완료] 예산 -2.8천만 / 안전 리스크-15%", condition: (s) => s.hasDetailDesign, lockMsg: "설계 필수", effect: (s) => { s.balance -= 28000000; s.debt = Math.max(0, s.debt - 15); } },
-        "2006": { tab: 'tab2', sub: '시설공사 (420)', name: "[420-04] 독신자숙소 BOQ 리모델링", isOneTime: true, desc: "🔒[실시설계완료] 예산 -2.5천만 / 간부 사기 +10%", condition: (s) => s.hasDetailDesign, lockMsg: "설계 필수", effect: (s) => { s.balance -= 25000000; s.trust += 10; } },
-        "2007": { tab: 'tab2', sub: '시설공사 (420)', name: "[420-04] 신축공사 현장 품질 감리", desc: "🔒[실시설계완료] 예산 -1천만 / 부실공사 리스크-5%", condition: (s) => s.hasDetailDesign, lockMsg: "설계 필수", effect: (s) => { s.balance -= 10000000; s.debt = Math.max(0, s.debt - 5); } },
+        "2002": { tab: 'tab2', sub: '시설공사 (420)', name: "[420-02] 비행단 주요시설 실시설계비", isOneTime: true, desc: "🔒[기본설계완료] 예산 -2천만 / 🌟공사 해금", condition: (s) => s.hasBasicDesign, lockMsg: "기본설계(420-01) 완료 필수", effect: (s) => { s.balance -= 20000000; s.hasDetailDesign = true; } },
+        "2003": { tab: 'tab2', sub: '시설공사 (420)', name: "[420-03] 주활주로 콘크리트 포장 공사", isOneTime: true, desc: "🔒[실시설계완료] 예산 -4천만 / 가동률 +20%", condition: (s) => s.hasDetailDesign, lockMsg: "실시설계(420-02) 필수", effect: (s) => { s.balance -= 40000000; s.trust += 20; } },
+        "2004": { tab: 'tab2', sub: '시설공사 (420)', name: "[420-03] 내폭구조 이글루(격납고) 신축", isOneTime: true, desc: "🔒[실시설계완료] 예산 -3.5천만 / 생존성 가동률+15%", condition: (s) => s.hasDetailDesign, lockMsg: "실시설계(420-02) 필수", effect: (s) => { s.balance -= 35000000; s.trust += 15; } },
+        "2005": { tab: 'tab2', sub: '시설공사 (420)', name: "[420-03] 탄약고 방폭벽 보강공사", isOneTime: true, desc: "🔒[실시설계완료] 예산 -2.8천만 / 안전 리스크-15%", condition: (s) => s.hasDetailDesign, lockMsg: "실시설계(420-02) 필수", effect: (s) => { s.balance -= 28000000; s.debt = Math.max(0, s.debt - 15); } },
+        "2006": { tab: 'tab2', sub: '시설공사 (420)', name: "[420-04] 독신자숙소 BOQ 리모델링", isOneTime: true, desc: "🔒[실시설계완료] 예산 -2.5천만 / 간부 사기 +10%", condition: (s) => s.hasDetailDesign, lockMsg: "실시설계(420-02) 필수", effect: (s) => { s.balance -= 25000000; s.trust += 10; } },
+        "2007": { tab: 'tab2', sub: '시설공사 (420)', name: "[420-04] 신축공사 현장 품질 감리", desc: "🔒[실시설계완료] 예산 -1천만 / 부실공사 리스크-5%", condition: (s) => s.hasDetailDesign, lockMsg: "실시설계(420-02) 필수", effect: (s) => { s.balance -= 10000000; s.debt = Math.max(0, s.debt - 5); } },
         "2008": { tab: 'tab2', sub: '자산취득 (430)', name: "[430-01] 최신 기상관측장비 도입", isOneTime: true, desc: "예산 -4천만 / 일반수용비 100만 영구절감", effect: (s) => { s.balance -= 40000000; s.trust += 10; s.expenses["일반수용비 (210-01)"] = Math.max(500000, s.expenses["일반수용비 (210-01)"] - 1000000); } },
         "2009": { tab: 'tab2', sub: '자산취득 (430)', name: "[430-01] 대규모 무정전 전원장치(UPS)", isOneTime: true, desc: "예산 -1.2천만 / 정전 리스크 -10%", effect: (s) => { s.balance -= 12000000; s.debt = Math.max(0, s.debt - 10); } },
         "2010": { tab: 'tab2', sub: '자산취득 (430)', name: "[430-01] 지휘소 통합망 서버 구축", isOneTime: true, desc: "예산 -2.5천만 / 작전 가동률 +15%", effect: (s) => { s.balance -= 25000000; s.trust += 15; } },
@@ -232,7 +233,7 @@
         "2014": { tab: 'tab2', sub: '자산취득 (430)', name: "[430-01] 재무/회계부서 전산장비(PC) 전면교체", isOneTime: true, desc: "예산 -1천만 / 🌟행정업무 100만 고정비절감", effect: (s) => { s.balance -= 10000000; s.expenses["부대운영/추진비 (210,240)"] = Math.max(300000, s.expenses["부대운영/추진비 (210,240)"] - 1000000); s.trust += 5; } },
         "2015": { tab: 'tab2', sub: '자산취득 (430)', name: "[430-01] 공군항공과학고 실습기자재 지원", desc: "예산 -3백만 / 군 전문인력 확보 (가동률+3%)", effect: (s) => { s.balance -= 3000000; s.trust += 3; } },
 
-        // Tab 3: 작전 및 훈련 수행
+        // Tab 3: 작전 및 훈련 수행 (주요 훈련도 최소한의 기본 설계 선행이 필요하도록 반영)
         "3001": { tab: 'tab3', sub: '장비유지 (210-09)', name: "[210-09] F-35A 스텔스 도료 창정비", desc: "예산 -2.5천만 / 작전 가동률 +20%", effect: (s) => { s.balance -= 25000000; s.trust += 20; } },
         "3002": { tab: 'tab3', sub: '장비유지 (210-09)', name: "[210-09] KF-16 엔진 외주수리 (PBL)", desc: "예산 -2천만 / 작전 가동률 +15%", effect: (s) => { s.balance -= 20000000; s.trust += 15; } },
         "3003": { tab: 'tab3', sub: '장비유지 (210-09)', name: "[210-09] 항공통제 레이더(MCRC) 정비", desc: "예산 -1.5천만 / 통제 가동률 +10%", effect: (s) => { s.balance -= 15000000; s.trust += 10; } },
@@ -242,8 +243,8 @@
         "3007": { tab: 'tab3', sub: '장비유지 (210-09)', name: "[210-09] 기상관측 레이더 캘리브레이션", desc: "예산 -4백만 / 작전 가동률 +3%", effect: (s) => { s.balance -= 4000000; s.trust += 3; } },
         "3008": { tab: 'tab3', sub: '장비유지 (210-09)', name: "[210-09] 특수 제설차량 유지보수", desc: "예산 -6백만 / 폭설 대응 리스크 -5%", effect: (s) => { s.balance -= 6000000; s.debt = Math.max(0, s.debt - 5); } },
         "3009": { tab: 'tab3', sub: '장비유지 (210-09)', name: "[210-09] 노후 통신회선망 교체작업", isOneTime: true, desc: "예산 -1.5천만 / 🌟장비유지 통신비 100만 영구절감", effect: (s) => { s.balance -= 15000000; s.expenses["시설장비유지비 (210-09)"] = Math.max(2000000, s.expenses["시설장비유지비 (210-09)"] - 1000000); } },
-        "3010": { tab: 'tab3', sub: '재료비 (210-11)', name: "[210-11] 대규모 연합훈련 탄약/유류 집행", desc: "예산 -3.5천만 / 가동률 +25%", effect: (s) => { s.balance -= 35000000; s.trust += 25; } },
-        "3011": { tab: 'tab3', sub: '재료비 (210-11)', name: "[210-11] 비행훈련용 항공유(JP-8) 구매", desc: "예산 -3천만 / 작전 가동률 +20%", effect: (s) => { s.balance -= 30000000; s.trust += 20; } },
+        "3010": { tab: 'tab3', sub: '재료비 (210-11)', name: "[210-11] 대규모 연합훈련 탄약/유류 집행", desc: "🔒[기본설계완료] 예산 -3.5천만 / 가동률 +25%", condition: (s) => s.hasBasicDesign, lockMsg: "기본조사설계(420-01) 완료 필요", effect: (s) => { s.balance -= 35000000; s.trust += 25; } },
+        "3011": { tab: 'tab3', sub: '재료비 (210-11)', name: "[210-11] 비행훈련용 항공유(JP-8) 구매", desc: "🔒[기본설계완료] 예산 -3천만 / 가동률 +20%", condition: (s) => s.hasBasicDesign, lockMsg: "기본조사설계(420-01) 완료 필요", effect: (s) => { s.balance -= 30000000; s.trust += 20; } },
         "3012": { tab: 'tab3', sub: '재료비 (210-11)', name: "[210-11] 패트리어트 유도탄 수리부속 조달", desc: "예산 -2천만 / 무장 가동률 +15%", effect: (s) => { s.balance -= 20000000; s.trust += 15; } },
         "3013": { tab: 'tab3', sub: '재료비 (210-11)', name: "[210-11] 정밀유도폭탄(JDAM) 핀 구매", desc: "예산 -1.5천만 / 무장 가동률 +10%", effect: (s) => { s.balance -= 15000000; s.trust += 10; } },
         "3014": { tab: 'tab3', sub: '재료비 (210-11)', name: "[210-11] 야전정비용 소모성 시약/부품", desc: "예산 -8백만 / 정비 가동률 +5%", effect: (s) => { s.balance -= 8000000; s.trust += 5; } },
@@ -281,7 +282,7 @@
         session: "", milId: "", rank: "", name: "", turn: 1, maxTurns: 10, 
         balance: 75000000, trust: 45, debt: 30,
         totalAllocated: 75000000, 
-        receivedSuppBudget: 0, // 💡 당기 수령한 추경 배정액을 모달에 띄우기 위한 상태값 추가
+        receivedSuppBudget: 0,
         eventTurn: Math.floor(Math.random() * 5) + 4,
         isCrisisEvent: Math.random() < 0.7,
         hasBasicDesign: false, hasDetailDesign: false, hasShortLoan: 0, hasLongLoan: 0,
@@ -447,6 +448,7 @@
             return;
         }
 
+        // 💡 [버그 2 해결] 실행 취소 시 집행률(totalAllocated) 원상 복구를 위해 현재 상태 전체를 깊은 복사하여 History에 저장
         stateHistory.push(JSON.parse(JSON.stringify(gameState)));
         action.effect(gameState);
         gameState.turnAppliedCodes.push(code);
@@ -471,6 +473,8 @@
         if (stateHistory.length === 0) return;
         const lastCode = gameState.turnAppliedCodes[gameState.turnAppliedCodes.length - 1];
         const actionName = codeDict[lastCode].name;
+        
+        // 💡 [버그 2 해결] 이전 상태로 완벽히 덮어쓰기 (totalAllocated 포함)
         const previousState = stateHistory.pop();
         Object.keys(previousState).forEach(key => { gameState[key] = previousState[key]; });
 
@@ -590,12 +594,21 @@
         }
     });
 
+    let suppTimeout; // 타임아웃 변수 추가
+
     socket.on('wait_for_supp_budget', (serverTurn) => {
         if (gameState.balance < 0) return;
         gameState.turn = serverTurn;
         document.getElementById("supp-msg-area").innerText = "";
         document.getElementById("supp-modal").classList.remove("hidden");
         
+        // 💡 [버그 4 해결] 추경 팝업이 15초 이상 지속되면 강제 탈출 버튼 활성화
+        document.getElementById("btn-supp-timeout").classList.add("hidden");
+        clearTimeout(suppTimeout);
+        suppTimeout = setTimeout(() => {
+            document.getElementById("btn-supp-timeout").classList.remove("hidden");
+        }, 15000);
+
         socket.emit('update_state', {
             sessionCode: gameState.session, milId: gameState.milId,
             balance: gameState.balance, trust: gameState.trust, debt: gameState.debt,
@@ -605,11 +618,24 @@
         });
     });
 
-    // 💡 [요청사항 완벽반영] 추경을 받았을 때 모달을 위한 값 저장 및 팝업 분리 처리
+    // 💡 [버그 4 해결] 사용자가 통신 지연 등으로 팝업에 갇혔을 때 강제로 팝업을 닫고 턴 시작
+    function closeSuppModalForce() {
+        document.getElementById("supp-modal").classList.add("hidden");
+        clearTimeout(suppTimeout);
+        processAdminTurn();
+        socket.emit('update_state', {
+            sessionCode: gameState.session, milId: gameState.milId,
+            balance: gameState.balance, trust: gameState.trust, debt: gameState.debt,
+            execRate: calculateExecutionRate(gameState.balance),
+            availableCash: gameState.balance - getAdjustedExpenseTotal(),
+            turn: gameState.turn, status: '예산 집행 중', lastAction: `비상 진행`
+        });
+    }
+
     socket.on('receive_special_budget', (data) => {
         gameState.balance += data.amount;
         gameState.totalAllocated += data.amount; 
-        gameState.receivedSuppBudget += data.amount; // 팝업 출력을 위해 임시 저장
+        gameState.receivedSuppBudget += data.amount;
         
         addLog(`<br><span style="color:var(--blue); font-weight:900; font-size:14px;">[국방부 긴급 자금 배정] 특별 추경 예산 ${formatMoney(data.amount)}이(가) 수혈되었습니다!</span>`);
         
@@ -629,6 +655,7 @@
     socket.on('trigger_next_turn', (serverTurn) => {
         if (gameState.balance < 0) return;
         document.getElementById("supp-modal").classList.add("hidden");
+        clearTimeout(suppTimeout);
 
         if (serverTurn > 10) {
             showResult();
@@ -699,7 +726,6 @@
 
         let newExpectedExpense = getAdjustedExpenseTotal();
 
-        // 💡 [요청 반영] 추경을 받았을 경우 모달에서 기본 예산과 분리해서 띄움
         let suppHtml = "";
         if (gameState.receivedSuppBudget > 0) {
             suppHtml = `<p>🎁 <b>특별 추경 배정액:</b> <span style="color:#10B981; font-size:16px; font-weight:900;">+${formatMoney(gameState.receivedSuppBudget)}</span></p>`;
@@ -713,7 +739,6 @@
             <p>📋 <b>이번 분기 고정비 지출 (예상):</b> <span style="font-weight:900;">${formatMoney(newExpectedExpense)}</span></p>
             </div>`;
 
-        // 💡 모달에 띄운 후에는 다음 턴을 위해 다시 초기화
         gameState.receivedSuppBudget = 0;
 
         document.getElementById("modal-title").innerText = `제 ${gameState.turn} 분기 자금배정`;
