@@ -40,15 +40,31 @@ io.on('connection', (socket) => {
         }
     });
 
+    // 💡 [버그 2 해결] 소켓 ID가 변경되더라도 고유 군번(milId)을 추적하여 실시간 연동 보장
     socket.on('update_state', (data) => {
-        let userSession = Object.keys(sessions).find(c => sessions[c].players[socket.id]);
-        if (userSession) {
-            Object.assign(sessions[userSession].players[socket.id], data);
-            io.to(userSession).emit('update_dashboard', {
-                players: sessions[userSession].players,
-                turn: sessions[userSession].turn,
-                phase: sessions[userSession].phase
-            });
+        const { sessionCode, milId } = data;
+        if (!sessionCode || !milId) return;
+
+        if (sessions[sessionCode]) {
+            let playerKey = Object.keys(sessions[sessionCode].players).find(k => sessions[sessionCode].players[k].milId === milId);
+            
+            if (playerKey) {
+                // 모바일 환경 등에서 소켓 연결이 끊겼다 다시 붙은 경우 식별자 강제 업데이트
+                if (playerKey !== socket.id) {
+                    sessions[sessionCode].players[socket.id] = sessions[sessionCode].players[playerKey];
+                    sessions[sessionCode].players[socket.id].socketId = socket.id;
+                    delete sessions[sessionCode].players[playerKey];
+                    playerKey = socket.id;
+                    socket.join(sessionCode); // 방 재입장
+                }
+                
+                Object.assign(sessions[sessionCode].players[playerKey], data);
+                io.to(sessionCode).emit('update_dashboard', {
+                    players: sessions[sessionCode].players,
+                    turn: sessions[sessionCode].turn,
+                    phase: sessions[sessionCode].phase
+                });
+            }
         }
     });
 
@@ -59,7 +75,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 💡 턴 넘김 시 4~8턴이면 '추경 대기' 상태로 전환
     socket.on('force_next_turn', (sessionCode) => {
         if (sessions[sessionCode]) {
             sessions[sessionCode].turn++;
@@ -86,7 +101,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 💡 운영자의 추경 완료 후 '본예산 집행 시작' 승인
     socket.on('start_execution', (sessionCode) => {
         if (sessions[sessionCode]) {
             sessions[sessionCode].phase = 'playing';

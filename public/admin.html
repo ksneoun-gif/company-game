@@ -72,6 +72,13 @@
         
         let currentSession = "";
 
+        // 💡 [버그 2 해결] 서버 재기동 혹은 연결 불안정 시 관제망 강제 재접속
+        socket.on('connect', () => {
+            if (currentSession) {
+                socket.emit('join_game', { sessionCode: currentSession, isOperator: true });
+            }
+        });
+
         function connectAdmin() {
             currentSession = document.getElementById("sessionCode").value.trim();
             if (!currentSession) return alert("세션 번호를 입력하세요.");
@@ -98,9 +105,7 @@
                 }
                 
                 let statusColor = p.status.includes('결산 마감') || p.status.includes('추경') ? '#0055FF' : (p.status.includes('사고') || p.status.includes('끊김') ? '#EF4444' : '#111827');
-                let execRate = p.execRate !== undefined ? p.execRate.toFixed(1) : "0.0";
-                
-                // 실제 사용가능 금액 기반 추경 요망 판별 (< 1000만)
+                let execRate = p.execRate !== undefined ? Number(p.execRate).toFixed(1) : "0.0";
                 let availCash = p.availableCash || 0;
                 let needsSupp = availCash < 10000000 ? `<span style="color:#EF4444; font-weight:bold; font-size:12px;">🚨 추경 요망</span>` : `<span style="color:#10B981; font-size:12px;">✅ 안정적</span>`;
                 let canGrant = (p.turn >= 4 && p.turn <= 8 && !p.status.includes('사고'));
@@ -131,7 +136,6 @@
                 btnNext.style.background = "#0055FF"; btnNext.innerText = "🏆 10분기 완료! [재정 종합 결산 진행] ➡️";
                 btnNext.onclick = forceNextTurn;
             } else if (phase === 'waiting_supp') {
-                // 💡 서버가 추경 대기 상태일 때, 버튼 역할 교체
                 btnNext.style.background = "#10B981"; 
                 btnNext.innerText = "✅ 개별 추경 완료 및 본예산 집행 시작 (게임 재개) ➡️";
                 btnNext.onclick = () => { socket.emit('start_execution', currentSession); };
