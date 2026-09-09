@@ -198,7 +198,6 @@
     let sessionPlayers = {};
     socket.on('update_dashboard', (data) => { sessionPlayers = data.players || data; });
 
-    // 💡 1회 한정 절감 효과 (0원 방지 Math.max 적용)
     const codeDict = {
         // Tab 1: 예산 편성 및 여비
         "1001": { tab: 'tab1', sub: '예산 전용 및 배정', name: "분기 세출예산 당겨쓰기", desc: "예산 +3천만 / 매턴 감사페널티 +150만", effect: (s) => { s.balance += 30000000; s.totalAllocated += 30000000; s.debt += 15; s.expenses["감사/불용 페널티"] += 1500000; s.hasShortLoan += 1; } },
@@ -230,7 +229,7 @@
         "2011": { tab: 'tab2', sub: '자산취득 (430)', name: "[430-01] 조종사 LVC 시뮬레이터 시스템", isOneTime: true, desc: "예산 -3.5천만 / 훈련 가동률 +20%", effect: (s) => { s.balance -= 35000000; s.trust += 20; } },
         "2012": { tab: 'tab2', sub: '자산취득 (430)', name: "[430-01] 폭발물 처리(EOD) 로봇 도입", isOneTime: true, desc: "예산 -1.8천만 / 폭발 사고 리스크 -15%", effect: (s) => { s.balance -= 18000000; s.debt = Math.max(0, s.debt - 15); } },
         "2013": { tab: 'tab2', sub: '자산취득 (430)', name: "[430-01] 항공기 견인차(토윙카) 구매", isOneTime: true, desc: "예산 -1.4천만 / 정비 가동률 +10%", effect: (s) => { s.balance -= 14000000; s.trust += 10; } },
-        "2014": { tab: 'tab2', sub: '자산취득 (430)', name: "[430-01] 재무/회계부서 전산장비(PC) 전면교체", isOneTime: true, desc: "예산 -1천만 / 🌟행정업무 50만 고정비절감", effect: (s) => { s.balance -= 10000000; s.expenses["부대운영/추진비 (210,240)"] = Math.max(300000, s.expenses["부대운영/추진비 (210,240)"] - 500000); s.trust += 5; } },
+        "2014": { tab: 'tab2', sub: '자산취득 (430)', name: "[430-01] 재무/회계부서 전산장비(PC) 전면교체", isOneTime: true, desc: "예산 -1천만 / 🌟행정업무 100만 고정비절감", effect: (s) => { s.balance -= 10000000; s.expenses["부대운영/추진비 (210,240)"] = Math.max(300000, s.expenses["부대운영/추진비 (210,240)"] - 1000000); s.trust += 5; } },
         "2015": { tab: 'tab2', sub: '자산취득 (430)', name: "[430-01] 공군항공과학고 실습기자재 지원", desc: "예산 -3백만 / 군 전문인력 확보 (가동률+3%)", effect: (s) => { s.balance -= 3000000; s.trust += 3; } },
 
         // Tab 3: 작전 및 훈련 수행
@@ -270,7 +269,6 @@
         "4012": { tab: 'tab4', sub: '업무 및 연구 (240/260)', name: "[240-01] 국방기술품질원 기술교류 회의비", desc: "예산 -3백만 / 조달 리스크 -4%", effect: (s) => { s.balance -= 3000000; s.debt = Math.max(0, s.debt - 4); } },
         "4013": { tab: 'tab4', sub: '업무 및 연구 (240/260)', name: "[240-02] 지자체 민군협의 간담회(업추비)", desc: "예산 -3백만 / 민원 리스크 -5%", effect: (s) => { s.balance -= 3000000; s.debt = Math.max(0, s.debt - 5); } },
         "4014": { tab: 'tab4', sub: '업무 및 연구 (240/260)', name: "[260-01] 국방중기계획(F+2~6) 연구용역", desc: "예산 -8백만 / 중장기 사업계획 리스크 -10%", effect: (s) => { s.balance -= 8000000; s.debt = Math.max(0, s.debt - 10); } },
-        // 💡 [수정완료] 모든 비용절감 카드에 isOneTime 적용 및 최저 한도(0원 붕괴 방지) 적용
         "4015": { tab: 'tab4', sub: '재정 효율 (구체화)', name: "계약업체 이윤율 정밀 원가분석 (국가계약법)", isOneTime: true, desc: "예산 0 / 🌟장비유지비 200만 영구절감", effect: (s) => { s.expenses["시설장비유지비 (210-09)"] = Math.max(2000000, s.expenses["시설장비유지비 (210-09)"] - 2000000); } },
         "4016": { tab: 'tab4', sub: '재정 효율 (구체화)', name: "자체결산심사 및 지출결의서 전수검사", desc: "예산 -2백만 / 감사 지적(리스크) -15%", effect: (s) => { s.balance -= 2000000; s.debt = Math.max(0, s.debt - 15); } },
         "4017": { tab: 'tab4', sub: '재정 효율 (구체화)', name: "성과기반군수(PBL) 성과평가 및 지체상금 부과", isOneTime: true, desc: "예산 0 / 🌟항공유류비 200만 영구절감", effect: (s) => { s.expenses["항공유류비 (210-11)"] = Math.max(5000000, s.expenses["항공유류비 (210-11)"] - 2000000); } },
@@ -279,11 +277,11 @@
         "4020": { tab: 'tab4', sub: '재정 효율 (구체화)', name: "[210-16] 부서운영비 및 격려금 강제 삭감 (불용방지)", isOneTime: true, desc: "예산 0 / 고정비 50만 감소 / ⚠️가동률-10", effect: (s) => { s.expenses["부대운영/추진비 (210,240)"] = Math.max(300000, s.expenses["부대운영/추진비 (210,240)"] - 500000); s.trust = Math.max(0, s.trust - 10); } }
     };
 
-    // 💡 [수정완료] 가동률 45, 리스크 30 초기값 및 턴당 4회 결의 설정
     const gameState = {
         session: "", milId: "", rank: "", name: "", turn: 1, maxTurns: 10, 
         balance: 75000000, trust: 45, debt: 30,
         totalAllocated: 75000000, 
+        receivedSuppBudget: 0, // 💡 당기 수령한 추경 배정액을 모달에 띄우기 위한 상태값 추가
         eventTurn: Math.floor(Math.random() * 5) + 4,
         isCrisisEvent: Math.random() < 0.7,
         hasBasicDesign: false, hasDetailDesign: false, hasShortLoan: 0, hasLongLoan: 0,
@@ -341,7 +339,7 @@
             name: "사고이월 연내 집행 실패 및 계약잔금 부족", 
             msg: "전년도 사고이월된 대규모 시설공사(420)의 연내 집행이 불가능해졌습니다!<br>계약잔금을 치르기 위해 당해 회계연도 예산 일부를 무리하게 떼어옵니다.", 
             apply: (s) => { s.balance -= 20000000; s.debt += 15; },
-            getImpact: () => `<span style='color:var(--red);'>💸 예산 강제 차감 -20,000,000 ₩</span><br><span style='color:var(--red);'>📈 불용 리스크 +15% 증가</span>`
+            getImpact: () => `<span style='color:var(--red);'>💸 당해 예산 강제 차감 -20,000,000 ₩</span><br><span style='color:var(--red);'>📈 불용 리스크 +15% 증가</span>`
         },
         { 
             name: "방위사업청 특별 원가감사 불시 착수", 
@@ -510,7 +508,6 @@
         renderCards();
     }
 
-    // 💡 [버그 2 해결] 서버 재접속 시 동기화 (모바일 잠금화면 방지)
     socket.on('connect', () => {
         if (gameState.session && gameState.milId) {
             socket.emit('join_game', { 
@@ -608,10 +605,12 @@
         });
     });
 
-    // 💡 [버그 1 해결] 예산 획득/추경 수신 시 totalAllocated(집행률 계산 모수) 동시 반영
+    // 💡 [요청사항 완벽반영] 추경을 받았을 때 모달을 위한 값 저장 및 팝업 분리 처리
     socket.on('receive_special_budget', (data) => {
         gameState.balance += data.amount;
         gameState.totalAllocated += data.amount; 
+        gameState.receivedSuppBudget += data.amount; // 팝업 출력을 위해 임시 저장
+        
         addLog(`<br><span style="color:var(--blue); font-weight:900; font-size:14px;">[국방부 긴급 자금 배정] 특별 추경 예산 ${formatMoney(data.amount)}이(가) 수혈되었습니다!</span>`);
         
         const suppMsg = document.getElementById("supp-msg-area");
@@ -700,12 +699,22 @@
 
         let newExpectedExpense = getAdjustedExpenseTotal();
 
+        // 💡 [요청 반영] 추경을 받았을 경우 모달에서 기본 예산과 분리해서 띄움
+        let suppHtml = "";
+        if (gameState.receivedSuppBudget > 0) {
+            suppHtml = `<p>🎁 <b>특별 추경 배정액:</b> <span style="color:#10B981; font-size:16px; font-weight:900;">+${formatMoney(gameState.receivedSuppBudget)}</span></p>`;
+        }
+
         let modalHtml = alertHtml + `<div style="background: var(--gray-light); padding: 16px; border-radius: 12px; border: 1px solid var(--gray-border);">
-            <p>💰 <b>당기 예산 배정액:</b> <span style="color:var(--blue); font-size:16px;">+${formatMoney(baseInflow)}</span></p>
+            <p>💰 <b>당기 기본 배정액:</b> <span style="color:var(--blue); font-size:16px; font-weight:900;">+${formatMoney(baseInflow)}</span></p>
+            ${suppHtml}
             <p>📉 <b>현재 총 가용 예산 잔액:</b> ${formatMoney(gameState.balance)}</p>
             <hr style="border: 1px dashed #CBD5E1; margin: 15px 0;">
             <p>📋 <b>이번 분기 고정비 지출 (예상):</b> <span style="font-weight:900;">${formatMoney(newExpectedExpense)}</span></p>
             </div>`;
+
+        // 💡 모달에 띄운 후에는 다음 턴을 위해 다시 초기화
+        gameState.receivedSuppBudget = 0;
 
         document.getElementById("modal-title").innerText = `제 ${gameState.turn} 분기 자금배정`;
         document.getElementById("modal-content").innerHTML = modalHtml;
